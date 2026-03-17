@@ -1,5 +1,6 @@
 import { json, error } from '../middleware/cors';
 import { requireAuth, requireAdmin } from '../middleware/auth';
+import { uniqueSlug } from '../services/slugify';
 import type { Env } from '../types';
 
 export async function handlePosts(path: string, method: string, request: Request, env: Env): Promise<Response | null> {
@@ -107,9 +108,8 @@ export async function handlePosts(path: string, method: string, request: Request
       .bind(body.category_id || 0, body.category_slug || '').first<{ id: number }>();
     const categoryId = cat?.id || 1;
 
-    // Build slug from title
-    const baseSlug = autoTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const unique = `${baseSlug}-${Date.now()}`;
+    // Build slug from title — unique, no timestamp suffix
+    const unique = await uniqueSlug(env.DB, autoTitle);
 
     const result = await env.DB.prepare(`
       INSERT INTO posts (title, slug, excerpt, content, category_id, author_id, ai_generated, meta_title, meta_desc, status, published_at)
