@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tag — SageBlog</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
+    <nav class="header-nav"><a href="/">Home</a></nav>
+    <div class="header-actions" id="header-auth"></div>
+  </div>
+</header>
+
+<section class="hero" style="padding:2.5rem 0">
+  <div class="container">
+    <div class="post-card-category" style="margin-bottom:0.75rem">Tag</div>
+    <h1 id="tag-title">Loading…</h1>
+  </div>
+</section>
+
+<main>
+  <div class="container section">
+    <div class="post-grid" id="posts-grid"></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom">
+      <span>© 2025 SageBlog.cfd</span>
+      <a href="/">← Back to Home</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+import { get } from '/assets/js/api.js';
+import { updateHeaderAuth } from '/assets/js/auth.js';
+import { renderPostCard, renderSkeleton, escHtml, slugFromPath } from '/assets/js/utils.js';
+import { setMeta } from '/assets/js/seo.js';
+
+updateHeaderAuth();
+
+const tagSlug = slugFromPath('/tag/');
+if (!tagSlug) window.location.href = '/';
+
+let page = 1;
+const postsGrid = document.getElementById('posts-grid');
+const pagination = document.getElementById('pagination');
+
+get(`/tags/${tagSlug}`).then(tag => {
+  document.getElementById('tag-title').textContent = `#${tag.name}`;
+  setMeta({
+    title: `#${tag.name} — Posts`,
+    description: `Browse all SageBlog posts tagged with "${tag.name}".`,
+    url: `https://sageblog.cfd/tag/${tag.slug}`,
+  });
+}).catch(() => {});
+
+async function loadPosts() {
+  postsGrid.innerHTML = renderSkeleton(6);
+  try {
+    const data = await get(`/posts?tag=${tagSlug}&page=${page}&limit=9`);
+    postsGrid.innerHTML = data.posts.length
+      ? data.posts.map(renderPostCard).join('')
+      : `<div class="text-center text-muted" style="grid-column:1/-1;padding:3rem">No posts with this tag.</div>`;
+
+    const { pages } = data.pagination;
+    pagination.innerHTML = '';
+    if (pages > 1) {
+      if (page > 1) pagination.innerHTML += `<button class="page-btn" onclick="go(${page-1})">← Prev</button>`;
+      if (page < pages) pagination.innerHTML += `<button class="page-btn" onclick="go(${page+1})">Next →</button>`;
+    }
+  } catch {
+    postsGrid.innerHTML = `<div class="text-center text-muted" style="grid-column:1/-1;padding:3rem">Failed to load posts.</div>`;
+  }
+}
+
+window.go = p => { page = p; loadPosts(); window.scrollTo(0,0); };
+loadPosts();
+</script>
+</body>
+</html>

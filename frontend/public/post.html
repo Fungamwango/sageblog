@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading… — SageBlog</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
+    <nav class="header-nav">
+      <a href="/">Home</a>
+      <a href="/category/technology">Tech</a>
+      <a href="/category/science">Science</a>
+      <a href="/category/business">Business</a>
+      <a href="/category/health">Health</a>
+    </nav>
+    <div class="header-actions" id="header-auth"></div>
+  </div>
+</header>
+
+<div id="post-wrap">
+  <!-- Post Hero -->
+  <section class="post-hero">
+    <div class="container-narrow">
+      <div class="post-hero-category">
+        <span class="skeleton" style="height:22px;width:100px;display:inline-block;border-radius:999px"></span>
+      </div>
+      <div class="skeleton" style="height:48px;width:90%;margin-bottom:1rem"></div>
+      <div class="skeleton" style="height:24px;width:70%;margin-bottom:1.5rem"></div>
+      <div class="flex items-center gap-4">
+        <span class="skeleton" style="height:16px;width:120px"></span>
+        <span class="skeleton" style="height:16px;width:80px"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Post Content -->
+  <div class="container-narrow">
+    <article class="post-content" id="post-content">
+      <div class="skeleton" style="height:16px;width:100%;margin-bottom:12px"></div>
+      <div class="skeleton" style="height:16px;width:95%;margin-bottom:12px"></div>
+      <div class="skeleton" style="height:16px;width:88%;margin-bottom:24px"></div>
+      <div class="skeleton" style="height:28px;width:60%;margin-bottom:16px"></div>
+      <div class="skeleton" style="height:16px;width:100%;margin-bottom:12px"></div>
+      <div class="skeleton" style="height:16px;width:92%;margin-bottom:12px"></div>
+    </article>
+
+    <!-- Post Footer (tags + like) -->
+    <div id="post-footer" style="padding:1.5rem 0;border-top:1px solid var(--border);display:flex;align-items:center;gap:1rem;flex-wrap:wrap"></div>
+
+    <!-- Comments -->
+    <section class="comments-section" id="comments-section" style="display:none">
+      <h3 id="comments-heading">Comments</h3>
+      <div id="comment-form-wrap"></div>
+      <div id="comments-list"></div>
+      <div class="pagination" id="comments-pagination"></div>
+    </section>
+  </div>
+</div>
+
+<aside style="background:var(--bg-card);border-top:1px solid var(--border);padding:2.5rem 0;margin-top:2rem">
+  <div class="container">
+    <div class="section-header">
+      <h3 class="section-title">More Posts</h3>
+      <a href="/" class="section-link">View all →</a>
+    </div>
+    <div class="post-grid" id="related-posts"></div>
+  </div>
+</aside>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom">
+      <span>© 2025 SageBlog.cfd</span>
+      <span>Powered by Cloudflare Workers AI</span>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+import { get, post, del } from '/assets/js/api.js';
+import { updateHeaderAuth, isLoggedIn, getUser } from '/assets/js/auth.js';
+import { escHtml, timeAgo, formatDate, slugFromPath, toast, renderPostCard } from '/assets/js/utils.js';
+import { setMeta, injectArticleLD } from '/assets/js/seo.js';
+
+updateHeaderAuth();
+
+const slug = slugFromPath('/post/');
+if (!slug) { window.location.href = '/'; }
+
+let postData = null;
+let commentsPage = 1;
+
+async function loadPost() {
+  try {
+    const p = await get(`/posts/${slug}`);
+    postData = p;
+    renderPost(p);
+    loadComments();
+    loadRelated(p.category_slug);
+  } catch {
+    document.getElementById('post-wrap').innerHTML = `
+      <div class="container-narrow" style="padding:4rem 1.5rem;text-align:center">
+        <h2>Post not found</h2>
+        <p class="text-muted">This post may have been removed.</p>
+        <a href="/" class="btn btn-primary" style="margin-top:1rem">← Back Home</a>
+      </div>`;
+  }
+}
+
+function renderPost(p) {
+  setMeta({
+    title: p.meta_title || p.title,
+    description: p.meta_desc || p.excerpt,
+    url: `https://sageblog.cfd/post/${p.slug}`,
+    type: 'article',
+  });
+
+  injectArticleLD({
+    title: p.title,
+    description: p.excerpt,
+    url: `https://sageblog.cfd/post/${p.slug}`,
+    publishedAt: p.published_at,
+    modifiedAt: p.updated_at,
+  });
+
+  document.querySelector('.post-hero').innerHTML = `
+    <div class="container-narrow">
+      <div class="post-hero-category">
+        <a href="/category/${escHtml(p.category_slug)}" class="post-card-category">${escHtml(p.category_name)}</a>
+        ${p.ai_generated ? '<span class="ai-badge" style="margin-left:0.5rem">🤖 AI</span>' : ''}
+      </div>
+      <h1 class="post-title">${escHtml(p.title)}</h1>
+      <p class="post-subtitle">${escHtml(p.excerpt)}</p>
+      <div class="post-byline">
+        <span class="post-byline-item">📅 ${formatDate(p.published_at)}</span>
+        <span class="post-byline-item">⏱ ${p.read_time || 5} min read</span>
+        <span class="post-byline-item">👁 ${p.view_count} views</span>
+        <span class="post-byline-item">♥ <span id="like-count">${p.like_count}</span> likes</span>
+        <span class="post-byline-item">💬 ${p.comment_count} comments</span>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('post-content').innerHTML = p.content;
+
+  // Post footer: tags + like
+  const tags = (p.tags || []).map(t =>
+    `<a href="/tag/${escHtml(t.toLowerCase().replace(/\s+/g,'-'))}" class="tag-pill">${escHtml(t)}</a>`
+  ).join('');
+
+  const likedClass = p.liked_by_user ? 'liked' : '';
+  document.getElementById('post-footer').innerHTML = `
+    <div class="post-tags" style="flex:1">${tags}</div>
+    <button class="like-btn ${likedClass}" id="like-btn" ${!isLoggedIn() ? 'title="Login to like"' : ''}>
+      ♥ <span id="like-btn-count">${p.like_count}</span> Like
+    </button>
+    <a href="/" class="btn btn-outline btn-sm">← Back</a>
+  `;
+
+  document.getElementById('like-btn').addEventListener('click', handleLike);
+  document.getElementById('comments-section').style.display = 'block';
+}
+
+async function handleLike() {
+  if (!isLoggedIn()) { toast('Please sign in to like posts', 'error'); return; }
+  try {
+    const data = await post(`/posts/${slug}/like`, {});
+    const btn = document.getElementById('like-btn');
+    btn.classList.toggle('liked', data.liked);
+    document.getElementById('like-count').textContent = data.like_count;
+    document.getElementById('like-btn-count').textContent = data.like_count;
+  } catch {
+    toast('Failed to update like', 'error');
+  }
+}
+
+async function loadComments() {
+  const user = getUser();
+  const formWrap = document.getElementById('comment-form-wrap');
+
+  if (isLoggedIn()) {
+    formWrap.innerHTML = `
+      <div class="comment-form">
+        <div class="form-group">
+          <label>Add a comment</label>
+          <textarea id="comment-input" placeholder="Share your thoughts…" rows="3"></textarea>
+        </div>
+        <button class="btn btn-primary btn-sm" id="submit-comment">Post Comment</button>
+      </div>
+    `;
+    document.getElementById('submit-comment').addEventListener('click', submitComment);
+  } else {
+    formWrap.innerHTML = `<p class="text-muted text-sm mb-4"><a href="/login">Sign in</a> to leave a comment.</p>`;
+  }
+
+  await fetchComments(1);
+}
+
+async function fetchComments(page) {
+  commentsPage = page;
+  try {
+    const data = await get(`/posts/${slug}/comments?page=${page}&limit=15`);
+    document.getElementById('comments-heading').textContent = `Comments (${data.total})`;
+    document.getElementById('comments-list').innerHTML = data.comments.length
+      ? data.comments.map(renderComment).join('')
+      : `<p class="text-muted text-sm">No comments yet. Be the first!</p>`;
+
+    const pages = Math.ceil(data.total / 15);
+    const pag = document.getElementById('comments-pagination');
+    pag.innerHTML = '';
+    if (pages > 1) {
+      if (page > 1) pag.innerHTML += `<button class="page-btn" onclick="fetchCommentPage(${page-1})">← Prev</button>`;
+      if (page < pages) pag.innerHTML += `<button class="page-btn" onclick="fetchCommentPage(${page+1})">Next →</button>`;
+    }
+  } catch {
+    document.getElementById('comments-list').innerHTML = `<p class="text-muted text-sm">Failed to load comments.</p>`;
+  }
+}
+
+window.fetchCommentPage = fetchComments;
+
+function renderComment(c, isReply = false) {
+  const user = getUser();
+  const initials = (c.username || '?').slice(0, 2).toUpperCase();
+  const canDelete = user && (user.id === c.user_id || user.role === 'admin');
+  const replies = (c.replies || []).map(r => renderComment(r, true)).join('');
+
+  return `
+    <div class="comment" data-id="${c.id}">
+      <div class="comment-avatar">${escHtml(initials)}</div>
+      <div style="flex:1">
+        <div class="comment-body">
+          <div class="comment-header">
+            <span class="comment-username">${escHtml(c.username)}</span>
+            <span class="comment-time">${timeAgo(c.created_at)}</span>
+          </div>
+          <div class="comment-text">${escHtml(c.content)}</div>
+          <div class="comment-actions">
+            ${!isReply && isLoggedIn() ? `<button class="comment-action" onclick="showReply(${c.id})">Reply</button>` : ''}
+            ${canDelete ? `<button class="comment-action" style="color:var(--danger)" onclick="deleteComment(${c.id}, ${postData?.id})">Delete</button>` : ''}
+          </div>
+          <div id="reply-form-${c.id}"></div>
+        </div>
+        ${replies ? `<div class="comment-replies">${replies}</div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+window.showReply = (parentId) => {
+  const wrap = document.getElementById(`reply-form-${parentId}`);
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <div style="margin-top:0.75rem">
+      <textarea id="reply-${parentId}" placeholder="Write a reply…" rows="2" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.5rem;color:var(--text);font-family:inherit;font-size:0.875rem;outline:none;resize:vertical"></textarea>
+      <button class="btn btn-primary btn-sm" style="margin-top:0.5rem" onclick="submitReply(${parentId})">Reply</button>
+    </div>
+  `;
+};
+
+window.submitReply = async (parentId) => {
+  const input = document.getElementById(`reply-${parentId}`);
+  const content = input?.value?.trim();
+  if (!content) return;
+  try {
+    await post(`/posts/${slug}/comments`, { content, parent_id: parentId });
+    toast('Reply posted!');
+    fetchComments(commentsPage);
+  } catch (e) {
+    toast(e.message || 'Failed to post reply', 'error');
+  }
+};
+
+window.deleteComment = async (id) => {
+  if (!confirm('Delete this comment?')) return;
+  try {
+    await del(`/comments/${id}`);
+    toast('Comment deleted');
+    fetchComments(commentsPage);
+  } catch {
+    toast('Failed to delete comment', 'error');
+  }
+};
+
+async function submitComment() {
+  const input = document.getElementById('comment-input');
+  const content = input.value.trim();
+  if (!content) { toast('Comment cannot be empty', 'error'); return; }
+  const btn = document.getElementById('submit-comment');
+  btn.disabled = true;
+  btn.textContent = 'Posting…';
+  try {
+    await post(`/posts/${slug}/comments`, { content });
+    input.value = '';
+    toast('Comment posted!');
+    fetchComments(1);
+  } catch (e) {
+    toast(e.message || 'Failed to post comment', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Post Comment';
+  }
+}
+
+async function loadRelated(categorySlug) {
+  if (!categorySlug) return;
+  try {
+    const data = await get(`/posts?category=${categorySlug}&limit=3`);
+    const others = data.posts.filter(p => p.slug !== slug).slice(0, 3);
+    document.getElementById('related-posts').innerHTML = others.map(renderPostCard).join('');
+  } catch {}
+}
+
+loadPost();
+</script>
+</body>
+</html>

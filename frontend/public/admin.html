@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — SageBlog</title>
+  <meta name="robots" content="noindex,nofollow">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
+    <span style="color:var(--text-muted);font-size:0.875rem">Admin Panel</span>
+    <div class="header-actions" id="header-auth"></div>
+  </div>
+</header>
+
+<div class="admin-layout">
+  <nav class="admin-sidebar">
+    <h4>Menu</h4>
+    <button class="admin-nav-item active" onclick="showTab('dashboard')">📊 Dashboard</button>
+    <button class="admin-nav-item" onclick="showTab('generate')">🤖 Generate Posts</button>
+    <button class="admin-nav-item" onclick="showTab('logs')">📋 AI Logs</button>
+    <div style="height:1px;background:var(--border);margin:1rem 0"></div>
+    <a href="/" class="admin-nav-item">← Back to Blog</a>
+  </nav>
+
+  <main class="admin-content" id="admin-content">
+    <!-- Dashboard Tab -->
+    <div id="tab-dashboard">
+      <h2 style="margin-bottom:1.5rem">Dashboard</h2>
+      <div class="stat-cards" id="stat-cards">
+        <div class="stat-card skeleton" style="height:90px"></div>
+        <div class="stat-card skeleton" style="height:90px"></div>
+        <div class="stat-card skeleton" style="height:90px"></div>
+        <div class="stat-card skeleton" style="height:90px"></div>
+        <div class="stat-card skeleton" style="height:90px"></div>
+      </div>
+    </div>
+
+    <!-- Generate Tab -->
+    <div id="tab-generate" class="hidden">
+      <h2 style="margin-bottom:0.5rem">Generate AI Posts</h2>
+      <p class="text-muted text-sm" style="margin-bottom:1.5rem">Trigger AI to generate new blog posts immediately.</p>
+
+      <div class="sidebar-widget" style="max-width:500px">
+        <div class="form-group">
+          <label>Category (optional — leave blank to auto-rotate)</label>
+          <select id="gen-category">
+            <option value="">Auto (round-robin)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Number of posts to generate</label>
+          <select id="gen-count">
+            <option value="1">1 post</option>
+            <option value="2">2 posts</option>
+            <option value="3">3 posts</option>
+            <option value="5">5 posts</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="gen-btn">🤖 Generate Now</button>
+      </div>
+
+      <div id="gen-results" style="margin-top:1.5rem"></div>
+    </div>
+
+    <!-- Logs Tab -->
+    <div id="tab-logs" class="hidden">
+      <h2 style="margin-bottom:1.5rem">AI Generation Logs</h2>
+      <div id="logs-table"></div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { get, post } from '/assets/js/api.js';
+import { updateHeaderAuth, isAdmin } from '/assets/js/auth.js';
+import { escHtml, formatDate, toast } from '/assets/js/utils.js';
+
+updateHeaderAuth();
+
+if (!isAdmin()) {
+  document.querySelector('.admin-layout').innerHTML = `
+    <div style="padding:4rem;text-align:center;width:100%">
+      <h2>Access Denied</h2>
+      <p class="text-muted">You need admin access.</p>
+      <a href="/login" class="btn btn-primary" style="margin-top:1rem">Sign In</a>
+    </div>`;
+} else {
+  init();
+}
+
+function init() {
+  loadStats();
+  loadCategoriesForGen();
+
+  document.getElementById('gen-btn').addEventListener('click', generatePosts);
+}
+
+window.showTab = (tab) => {
+  ['dashboard', 'generate', 'logs'].forEach(t => {
+    document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+  });
+  document.querySelectorAll('.admin-nav-item').forEach((btn, i) => {
+    btn.classList.toggle('active', btn.getAttribute('onclick') === `showTab('${tab}')`);
+  });
+  if (tab === 'logs') loadLogs();
+};
+
+async function loadStats() {
+  try {
+    const s = await get('/admin/stats');
+    document.getElementById('stat-cards').innerHTML = `
+      <div class="stat-card"><div class="stat-label">Total Posts</div><div class="stat-value">${s.posts}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Users</div><div class="stat-value">${s.users}</div></div>
+      <div class="stat-card"><div class="stat-label">Comments</div><div class="stat-value">${s.comments}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Likes</div><div class="stat-value">${s.total_likes}</div></div>
+      <div class="stat-card"><div class="stat-label">Total Views</div><div class="stat-value">${s.total_views}</div></div>
+    `;
+  } catch {
+    toast('Failed to load stats', 'error');
+  }
+}
+
+async function loadCategoriesForGen() {
+  try {
+    const cats = await get('/categories');
+    const sel = document.getElementById('gen-category');
+    sel.innerHTML = `<option value="">Auto (round-robin)</option>` +
+      cats.map(c => `<option value="${escHtml(c.slug)}">${escHtml(c.name)}</option>`).join('');
+  } catch {}
+}
+
+async function generatePosts() {
+  const btn = document.getElementById('gen-btn');
+  const catSlug = document.getElementById('gen-category').value;
+  const count = parseInt(document.getElementById('gen-count').value);
+  const results = document.getElementById('gen-results');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating…';
+  results.innerHTML = `<div class="loader"><div class="spinner"></div></div><p class="text-muted text-sm" style="text-align:center;margin-top:0.5rem">This may take 10-30 seconds per post…</p>`;
+
+  try {
+    const data = await post('/admin/generate', { category_slug: catSlug || undefined, count });
+    results.innerHTML = data.generated.map(r => r.success
+      ? `<div style="background:rgba(34,197,94,0.1);border:1px solid #22c55e;border-radius:8px;padding:0.875rem 1rem;margin-bottom:0.75rem">
+          ✓ <strong><a href="/post/${escHtml(r.post?.slug)}" style="color:#4ade80">${escHtml(r.post?.title)}</a></strong>
+         </div>`
+      : `<div style="background:rgba(239,68,68,0.1);border:1px solid #ef4444;border-radius:8px;padding:0.875rem 1rem;margin-bottom:0.75rem">
+          ✕ Failed to generate post ${r.category ? `for ${escHtml(r.category)}` : ''}
+         </div>`
+    ).join('');
+    loadStats();
+  } catch (e) {
+    results.innerHTML = `<div style="color:var(--danger)">Generation failed: ${escHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🤖 Generate Now';
+  }
+}
+
+async function loadLogs() {
+  const wrap = document.getElementById('logs-table');
+  wrap.innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+  try {
+    const logs = await get('/admin/logs');
+    if (!logs.length) { wrap.innerHTML = '<p class="text-muted">No generation logs yet.</p>'; return; }
+    wrap.innerHTML = `
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:0.875rem">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);text-align:left">
+              <th style="padding:0.75rem;color:var(--text-dim)">Date</th>
+              <th style="padding:0.75rem;color:var(--text-dim)">Category</th>
+              <th style="padding:0.75rem;color:var(--text-dim)">Post Title</th>
+              <th style="padding:0.75rem;color:var(--text-dim)">Status</th>
+              <th style="padding:0.75rem;color:var(--text-dim)">Trigger</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${logs.map(l => `
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:0.75rem;color:var(--text-muted)">${formatDate(l.created_at)}</td>
+                <td style="padding:0.75rem">${escHtml(l.category_name || '—')}</td>
+                <td style="padding:0.75rem">
+                  ${l.post_title
+                    ? `<a href="/post/${escHtml(l.post_id)}" style="color:var(--primary-light)">${escHtml(l.post_title)}</a>`
+                    : '<span style="color:var(--text-dim)">—</span>'}
+                </td>
+                <td style="padding:0.75rem">
+                  <span style="color:${l.status === 'success' ? 'var(--success)' : 'var(--danger)'}">${l.status}</span>
+                </td>
+                <td style="padding:0.75rem;color:var(--text-muted)">${escHtml(l.triggered_by)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch {
+    wrap.innerHTML = '<p style="color:var(--danger)">Failed to load logs.</p>';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Category — SageBlog</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
+    <nav class="header-nav">
+      <a href="/">Home</a>
+      <a href="/category/technology">Tech</a>
+      <a href="/category/science">Science</a>
+      <a href="/category/business">Business</a>
+      <a href="/category/health">Health</a>
+    </nav>
+    <div class="header-actions" id="header-auth"></div>
+  </div>
+</header>
+
+<section class="hero" style="padding:2.5rem 0">
+  <div class="container">
+    <div class="post-card-category" id="cat-label" style="margin-bottom:0.75rem">Category</div>
+    <h1 id="cat-title">Loading…</h1>
+    <p id="cat-desc" class="text-muted" style="margin-top:0.5rem"></p>
+  </div>
+</section>
+
+<main>
+  <div class="container">
+    <div class="content-layout">
+      <section class="section">
+        <div class="post-grid" id="posts-grid"></div>
+        <div class="pagination" id="pagination"></div>
+      </section>
+      <aside>
+        <div class="sidebar-widget">
+          <h4>All Categories</h4>
+          <ul class="category-list" id="all-categories"></ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom">
+      <span>© 2025 SageBlog.cfd</span>
+      <a href="/">← Back to Home</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+import { get } from '/assets/js/api.js';
+import { updateHeaderAuth } from '/assets/js/auth.js';
+import { renderPostCard, renderSkeleton, escHtml, slugFromPath } from '/assets/js/utils.js';
+import { setMeta } from '/assets/js/seo.js';
+
+updateHeaderAuth();
+
+const catSlug = slugFromPath('/category/');
+if (!catSlug) window.location.href = '/';
+
+let page = 1;
+const postsGrid = document.getElementById('posts-grid');
+const pagination = document.getElementById('pagination');
+
+// Load category info
+get(`/categories/${catSlug}`).then(cat => {
+  document.getElementById('cat-title').textContent = cat.name;
+  document.getElementById('cat-desc').textContent = cat.description || '';
+  document.getElementById('cat-label').textContent = cat.name;
+  setMeta({
+    title: `${cat.name} Articles`,
+    description: `Browse all ${cat.name} articles on SageBlog. ${cat.description || ''}`,
+    url: `https://sageblog.cfd/category/${cat.slug}`,
+  });
+}).catch(() => {});
+
+get('/categories').then(cats => {
+  document.getElementById('all-categories').innerHTML = cats.map(c => `
+    <li>
+      <a href="/category/${escHtml(c.slug)}" ${c.slug === catSlug ? 'style="color:#fff;font-weight:600"' : ''}>${escHtml(c.name)}</a>
+      <span class="category-count">${c.post_count || 0}</span>
+    </li>
+  `).join('');
+}).catch(() => {});
+
+async function loadPosts() {
+  postsGrid.innerHTML = renderSkeleton(6);
+  try {
+    const data = await get(`/posts?category=${catSlug}&page=${page}&limit=9`);
+    postsGrid.innerHTML = data.posts.length
+      ? data.posts.map(renderPostCard).join('')
+      : `<div class="text-center text-muted" style="grid-column:1/-1;padding:3rem">No posts in this category yet.</div>`;
+
+    const { pages } = data.pagination;
+    pagination.innerHTML = '';
+    if (pages > 1) {
+      if (page > 1) pagination.innerHTML += `<button class="page-btn" onclick="go(${page-1})">← Prev</button>`;
+      if (page < pages) pagination.innerHTML += `<button class="page-btn" onclick="go(${page+1})">Next →</button>`;
+    }
+  } catch {
+    postsGrid.innerHTML = `<div class="text-center text-muted" style="grid-column:1/-1;padding:3rem">Failed to load posts.</div>`;
+  }
+}
+
+window.go = p => { page = p; loadPosts(); window.scrollTo(0,0); };
+loadPosts();
+</script>
+</body>
+</html>
