@@ -6,8 +6,8 @@
   <title>Admin — SageBlog</title>
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  
   <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
 <header class="site-header">
   <div class="container header-inner">
     <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
-    <span style="color:var(--text-muted);font-size:0.875rem">Admin Panel</span>
+    <span style="color:var(--text-2);font-size:0.875rem">Admin Panel</span>
     <div class="header-actions" id="header-auth"></div>
   </div>
 </header>
@@ -89,7 +89,7 @@ if (!isAdmin()) {
   document.querySelector('.admin-layout').innerHTML = `
     <div style="padding:4rem;text-align:center;width:100%">
       <h2>Access Denied</h2>
-      <p class="text-muted">You need admin access.</p>
+      <p class="text-dim">You need admin access.</p>
       <a href="/login" class="btn btn-primary" style="margin-top:1rem">Sign In</a>
     </div>`;
 } else {
@@ -171,7 +171,7 @@ async function loadLogs() {
   wrap.innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
   try {
     const logs = await get('/admin/logs');
-    if (!logs.length) { wrap.innerHTML = '<p class="text-muted">No generation logs yet.</p>'; return; }
+    if (!logs.length) { wrap.innerHTML = '<p class="text-dim">No generation logs yet.</p>'; return; }
     wrap.innerHTML = `
       <div style="overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:0.875rem">
@@ -187,7 +187,7 @@ async function loadLogs() {
           <tbody>
             ${logs.map(l => `
               <tr style="border-bottom:1px solid var(--border)">
-                <td style="padding:0.75rem;color:var(--text-muted)">${formatDate(l.created_at)}</td>
+                <td style="padding:0.75rem;color:var(--text-2)">${formatDate(l.created_at)}</td>
                 <td style="padding:0.75rem">${escHtml(l.category_name || '—')}</td>
                 <td style="padding:0.75rem">
                   ${l.post_title
@@ -197,7 +197,7 @@ async function loadLogs() {
                 <td style="padding:0.75rem">
                   <span style="color:${l.status === 'success' ? 'var(--success)' : 'var(--danger)'}">${l.status}</span>
                 </td>
-                <td style="padding:0.75rem;color:var(--text-muted)">${escHtml(l.triggered_by)}</td>
+                <td style="padding:0.75rem;color:var(--text-2)">${escHtml(l.triggered_by)}</td>
               </tr>
             `).join('')}
           </tbody>

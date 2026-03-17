@@ -12,8 +12,8 @@
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  
   <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
@@ -103,7 +103,7 @@
         </div>
         <div class="sidebar-widget">
           <h4>About SageBlog</h4>
-          <p style="font-size:0.85rem;color:var(--text-muted);margin:0">AI-powered articles published automatically, covering the topics that matter most. Powered by Cloudflare AI.</p>
+          <p style="font-size:0.85rem;color:var(--text-2);margin:0">AI-powered articles published automatically, covering the topics that matter most. Powered by Cloudflare AI.</p>
           <div class="ai-badge" style="margin-top:0.75rem">🤖 AI Generated Content</div>
         </div>
       </aside>
@@ -116,7 +116,7 @@
   <div class="container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <div class="site-logo">🔮 Sage<span style="color:var(--primary)">Blog</span></div>
+        <div class="site-logo">🔮 Sage<span style="color:var(--purple)">Blog</span></div>
         <p>AI-powered knowledge blog. Fresh articles every day across six categories.</p>
       </div>
       <div class="footer-col">
@@ -212,7 +212,7 @@ get('/posts/featured').then(posts => {
   const [main, ...side] = posts;
   document.getElementById('featured-posts').innerHTML = `
     <div class="featured-main" onclick="location.href='/post/${escHtml(main.slug)}'">
-      <div class="post-card-category">
+      <div class="cat-pill">
         <a href="/category/${escHtml(main.category_slug)}" onclick="event.stopPropagation()">${escHtml(main.category_name)}</a>
       </div>
       <h2>${escHtml(main.title)}</h2>
@@ -225,7 +225,7 @@ get('/posts/featured').then(posts => {
     <div class="featured-side">
       ${side.map(p => `
         <div class="post-card" onclick="location.href='/post/${escHtml(p.slug)}'">
-          <div class="post-card-category"><a href="/category/${escHtml(p.category_slug)}" onclick="event.stopPropagation()">${escHtml(p.category_name)}</a></div>
+          <div class="cat-pill"><a href="/category/${escHtml(p.category_slug)}" onclick="event.stopPropagation()">${escHtml(p.category_name)}</a></div>
           <h3>${escHtml(p.title)}</h3>
         </div>
       `).join('')}

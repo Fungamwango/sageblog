@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Loading… — SageBlog</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  
+  
   <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
@@ -109,7 +109,7 @@ async function loadPost() {
     document.getElementById('post-wrap').innerHTML = `
       <div class="container-narrow" style="padding:4rem 1.5rem;text-align:center">
         <h2>Post not found</h2>
-        <p class="text-muted">This post may have been removed.</p>
+        <p class="text-dim">This post may have been removed.</p>
         <a href="/" class="btn btn-primary" style="margin-top:1rem">← Back Home</a>
       </div>`;
   }
@@ -134,7 +134,7 @@ function renderPost(p) {
   document.querySelector('.post-hero').innerHTML = `
     <div class="container-narrow">
       <div class="post-hero-category">
-        <a href="/category/${escHtml(p.category_slug)}" class="post-card-category">${escHtml(p.category_name)}</a>
+        <a href="/category/${escHtml(p.category_slug)}" class="cat-pill">${escHtml(p.category_name)}</a>
         ${p.ai_generated ? '<span class="ai-badge" style="margin-left:0.5rem">🤖 AI</span>' : ''}
       </div>
       <h1 class="post-title">${escHtml(p.title)}</h1>
