@@ -45,32 +45,40 @@ export async function generatePost(env: Env, categorySlug: string, categoryId: n
   const topic = topics[Math.floor(Math.random() * topics.length)];
 
   const systemPrompt = `You are an expert blog writer for SageBlog (sageblog.cfd), a high-quality knowledge blog.
-Write detailed, informative, engaging blog posts. Always respond with ONLY valid JSON — no markdown fences, no explanation.`;
+Write detailed, informative, engaging blog posts.
+IMPORTANT: You must respond using EXACTLY this format with these exact delimiter lines — no other text:
+===TITLE===
+(title here)
+===SLUG===
+(slug here)
+===EXCERPT===
+(excerpt here)
+===TAGS===
+(comma separated tags)
+===META_TITLE===
+(meta title here)
+===META_DESC===
+(meta description here)
+===READ_TIME===
+(number only)
+===CONTENT===
+(full HTML content here)
+===END===`;
 
-  const userPrompt = `Write a detailed, well-structured blog post about: "${topic}" in the ${categorySlug} category.
+  const userPrompt = `Write a detailed blog post about: "${topic}" in the ${categorySlug} category.
+${recentTitles.length > 0 ? `Avoid these recent topics: ${recentTitles.slice(0, 4).join('; ')}` : ''}
 
-${recentTitles.length > 0 ? `Avoid these recently published titles:\n${recentTitles.map(t => `- ${t}`).join('\n')}\n` : ''}
+Title: Compelling and specific (under 70 chars)
+Slug: URL-friendly version of the title
+Excerpt: 150-200 character engaging summary
+Tags: 4-5 relevant tags, comma-separated
+Meta_title: SEO optimized, under 60 chars
+Meta_desc: 150-160 chars, complete sentence
+Read_time: estimated minutes (number only)
+Content: 900-1400 words using HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>
+Include at least 3 sections with <h2> headings.`;
 
-Requirements:
-- Original, insightful content (not generic)
-- 900-1400 words in the content field
-- Use proper HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>
-- Include at least 3 sections with <h2> headings
-- Practical examples or real-world context where relevant
-
-Respond with ONLY this JSON structure:
-{
-  "title": "Compelling, specific title (under 70 chars)",
-  "slug": "url-friendly-slug-from-title",
-  "excerpt": "Engaging 150-200 character summary that makes readers want to read more",
-  "content": "Full HTML blog post content here",
-  "tags": ["tag1", "tag2", "tag3", "tag4"],
-  "meta_title": "SEO title under 60 chars",
-  "meta_desc": "SEO meta description 150-160 chars ending with a complete sentence",
-  "read_time": 6
-}`;
-
-  let raw: string | null = null;
+  let raw = '';
   let parsed: GeneratedPost | null = null;
 
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -80,26 +88,23 @@ Respond with ONLY this JSON structure:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        max_tokens: 3000,
-        temperature: 0.8,
+        max_tokens: 3500,
+        temperature: 0.75,
       });
 
-      raw = typeof response === 'string' ? response : response?.response ?? JSON.stringify(response);
-
-      // Strip markdown code fences if model wraps them
-      raw = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
-
-      parsed = JSON.parse(raw) as GeneratedPost;
-      if (parsed.title && parsed.content && parsed.excerpt) break;
-    } catch {
-      if (attempt === 1) {
-        await logGeneration(env.DB, null, categoryId, userPrompt, MODEL, null, 'failed', `Parse error: ${raw?.substring(0, 200)}`);
-        return null;
-      }
+      raw = typeof response === 'string' ? response : (response?.response ?? '');
+      console.log(`[ai] attempt ${attempt} raw preview:`, raw.substring(0, 300));
+      parsed = raw ? parseResponse(raw) : null;
+      if (parsed?.title && parsed?.content && parsed?.excerpt) break;
+    } catch (err) {
+      console.error('[ai] model call failed:', err);
     }
   }
 
-  if (!parsed) return null;
+  if (!parsed) {
+    await logGeneration(env.DB, null, categoryId, userPrompt, MODEL, null, 'failed', `No parse: ${raw.substring(0, 300)}`);
+    return null;
+  }
 
   const slug = await uniqueSlug(env.DB, parsed.slug || parsed.title);
 
@@ -152,6 +157,78 @@ async function logGeneration(
     INSERT INTO ai_generation_log (post_id, category_id, prompt_used, model_used, tokens_used, status, error_msg, triggered_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'cron')
   `).bind(postId, categoryId, prompt.substring(0, 1000), model, tokens, status, error).run();
+}
+
+function parseResponse(raw: string): GeneratedPost | null {
+  // Try delimited format — model wraps title value in ===, uses ===KEY=== for rest
+  if (raw.includes('===')) {
+    const get = (key: string): string => {
+      const match = raw.match(new RegExp(`===${key}===\\s*([\\s\\S]*?)(?:===[A-Z_]+===|===END===|$)`));
+      return match ? match[1].trim() : '';
+    };
+    // Title may be wrapped as ===Title Value=== on first line
+    const titleWrapped = raw.match(/^===([^=\n][^\n]*?)===\s*\n/);
+    const title = titleWrapped ? titleWrapped[1].trim() : get('TITLE');
+    const content = get('CONTENT').replace(/===END===/g, '').trim();
+    if (title && content) {
+      return {
+        title,
+        slug: get('SLUG').replace(/^\//, '') || title,
+        excerpt: get('EXCERPT'),
+        content,
+        tags: get('TAGS').split(',').map(t => t.trim()).filter(Boolean),
+        meta_title: get('META_TITLE') || title,
+        meta_desc: get('META_DESC') || get('EXCERPT'),
+        read_time: parseInt(get('READ_TIME')) || 5,
+      };
+    }
+  }
+
+  // Fall back: extract JSON object even if content has unescaped chars
+  // Strategy: parse field by field using targeted regex instead of full JSON.parse
+  try {
+    // Strip markdown fences
+    let clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+    // Try standard JSON parse first
+    const obj = JSON.parse(clean) as GeneratedPost;
+    if (obj.title && obj.content) return obj;
+  } catch {
+    // Try to extract individual fields with regex when content breaks JSON
+    const getField = (key: string): string => {
+      const match = raw.match(new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`));
+      return match ? match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : '';
+    };
+    const getContent = (): string => {
+      // Content may span many lines — grab everything between "content": " and the next top-level "
+      const start = raw.indexOf('"content"');
+      if (start === -1) return '';
+      const afterKey = raw.indexOf('"', start + 9);
+      if (afterKey === -1) return '';
+      // Find the closing quote that ends the content value (before "tags" or "meta_title")
+      const endMarker = raw.search(/"(?:tags|meta_title|meta_desc|read_time)"\s*:/);
+      if (endMarker === -1) return raw.slice(afterKey + 1).replace(/"\s*}\s*$/, '');
+      return raw.slice(afterKey + 1, endMarker).replace(/",?\s*$/, '').trim();
+    };
+    const title = getField('title');
+    const content = getContent();
+    if (title && content) {
+      const tagsMatch = raw.match(/"tags"\s*:\s*\[([^\]]*)\]/);
+      const tags = tagsMatch
+        ? tagsMatch[1].match(/"([^"]+)"/g)?.map(t => t.replace(/"/g, '')) ?? []
+        : [];
+      return {
+        title,
+        slug: getField('slug') || title,
+        excerpt: getField('excerpt'),
+        content,
+        tags,
+        meta_title: getField('meta_title') || title,
+        meta_desc: getField('meta_desc') || getField('excerpt'),
+        read_time: parseInt(getField('read_time')) || 5,
+      };
+    }
+  }
+  return null;
 }
 
 export async function getNextCategory(env: Env): Promise<{ id: number; slug: string; name: string } | null> {
