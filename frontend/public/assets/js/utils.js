@@ -23,6 +23,13 @@ export function escHtml(str) {
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+export function linkify(text) {
+  return escHtml(text).replace(
+    /https?:\/\/[^\s<>"']+/g,
+    url => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary-light);word-break:break-all">${url}</a>`
+  );
+}
+
 export function slugFromPath(prefix = '') {
   const parts = window.location.pathname.replace(prefix, '').split('/').filter(Boolean);
   return parts[0] || '';
@@ -77,6 +84,8 @@ export function mdToHtml(raw) {
     .replace(/\*([^*\n]+?)\*/g, '<em>$1</em>')
     .replace(/_([^_\n]+?)_/g, '<em>$1</em>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/(?<![="'>])(https?:\/\/[^\s<>"']+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>')
     .replace(/^\*\s*/, '').trim();
 
   for (let line of lines) {
@@ -109,20 +118,27 @@ export function mdToHtml(raw) {
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-export function compressImage(file, maxKb = 20) {
+export function compressImage(file, maxKb = 60) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
       const canvas = document.createElement('canvas');
-      // Scale dimensions so estimated JPEG output fits within maxKb
-      const maxPx = (maxKb * 1024) / 2.5;
-      const ratio = Math.min(1, Math.sqrt(maxPx / (img.width * img.height)));
-      canvas.width = Math.round(img.width * ratio);
-      canvas.height = Math.round(img.height * ratio);
+      // Cap longest side at 1200px, then iterate quality until under maxKb
+      const maxSide = 1200;
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
       canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compression failed')), 'image/jpeg', 0.75);
+      const tryQuality = (q) => {
+        canvas.toBlob(blob => {
+          if (!blob) return reject(new Error('Compression failed'));
+          if (blob.size <= maxKb * 1024 || q <= 0.3) return resolve(blob);
+          tryQuality(Math.round((q - 0.05) * 100) / 100);
+        }, 'image/jpeg', q);
+      };
+      tryQuality(0.92);
     };
     img.onerror = reject;
     img.src = url;
@@ -150,25 +166,47 @@ export function renderPostCard(post) {
     `<a href="/tag/${escHtml(t.toLowerCase().replace(/\s+/g,'-'))}" class="tag-pill">${escHtml(t)}</a>`
   ).join('');
 
+  const imgSrc = post.content?.match(/<img[^>]+src="([^"]+)"/i)?.[1] || null;
+  const vidSrc = post.content?.match(/<video[^>]+src="([^"]+)"/i)?.[1] || null;
+
+  let mediaHtml = '';
+  if (vidSrc) {
+    mediaHtml = `<div class="post-card-media">
+      <video src="${escHtml(vidSrc)}" muted playsinline preload="metadata" class="post-card-media-el"></video>
+      <span class="post-card-media-badge">▶ Video</span>
+    </div>`;
+  } else if (imgSrc) {
+    mediaHtml = `<div class="post-card-media">
+      <img src="${escHtml(imgSrc)}" alt="${escHtml(post.title)}" loading="lazy" class="post-card-media-el">
+    </div>`;
+  }
+
   return `
-    <article class="post-card" onclick="location.href='/post/${escHtml(post.slug)}'">
-      <div class="post-card-top">
-        <a class="cat-pill" href="/category/${escHtml(post.category_slug || '')}" onclick="event.stopPropagation()">
-          ${escHtml(post.category_name || 'General')}
-        </a>
-        ${post.ai_generated ? '<span class="ai-badge">🤖 AI</span>' : ''}
-      </div>
-      <h3>${escHtml(post.title)}</h3>
-      <p>${escHtml(post.excerpt)}</p>
-      ${tags ? `<div class="post-tags">${tags}</div>` : ''}
-      <div class="post-card-footer">
-        <div class="post-meta">
-          <span class="meta-item">📅 ${formatDate(post.published_at)}</span>
-          <span class="meta-item">⏱ ${post.read_time || 5}m</span>
+    <article class="post-card${mediaHtml ? ' post-card--media' : ''}" onclick="location.href='/post/${escHtml(post.slug)}'">
+      ${mediaHtml}
+      <div class="post-card-body">
+        <div class="post-card-top">
+          <a class="cat-pill" href="/category/${escHtml(post.category_slug || '')}" onclick="event.stopPropagation()">
+            ${escHtml(post.category_name || 'General')}
+          </a>
+          ${post.ai_generated
+            ? '<span class="ai-badge">🤖 AI</span>'
+            : post.author_username
+              ? `<span class="ai-badge" style="background:rgba(99,102,241,0.15);color:var(--primary-light);border:1px solid rgba(99,102,241,0.3)">👤 ${escHtml(post.author_username)}</span>`
+              : ''}
         </div>
-        <div class="post-meta">
-          <span class="meta-item">♥ ${post.like_count || 0}</span>
-          <span class="meta-item">💬 ${post.comment_count || 0}</span>
+        <h3>${escHtml(post.title)}</h3>
+        <p>${escHtml(post.excerpt)}</p>
+        ${tags ? `<div class="post-tags">${tags}</div>` : ''}
+        <div class="post-card-footer">
+          <div class="post-meta">
+            <span class="meta-item">📅 ${formatDate(post.published_at)}</span>
+            <span class="meta-item">⏱ ${post.read_time || 5}m</span>
+          </div>
+          <div class="post-meta">
+            <span class="meta-item">♥ ${post.like_count || 0}</span>
+            <span class="meta-item">💬 ${post.comment_count || 0}</span>
+          </div>
         </div>
       </div>
     </article>

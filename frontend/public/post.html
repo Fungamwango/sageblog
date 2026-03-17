@@ -90,7 +90,7 @@
 <script type="module">
 import { get, post, del, patch } from '/assets/js/api.js';
 import { updateHeaderAuth, isLoggedIn, getUser } from '/assets/js/auth.js';
-import { escHtml, timeAgo, formatDate, slugFromPath, toast, renderPostCard, mdToHtml } from '/assets/js/utils.js';
+import { escHtml, linkify, timeAgo, formatDate, slugFromPath, toast, renderPostCard, mdToHtml } from '/assets/js/utils.js';
 import { setMeta, injectArticleLD, extractMedia } from '/assets/js/seo.js';
 
 updateHeaderAuth();
@@ -145,7 +145,11 @@ function renderPost(p) {
     <div class="container-narrow">
       <div class="post-hero-category">
         <a href="/category/${escHtml(p.category_slug)}" class="cat-pill">${escHtml(p.category_name)}</a>
-        ${p.ai_generated ? '<span class="ai-badge" style="margin-left:0.5rem">🤖 AI</span>' : ''}
+        ${p.ai_generated
+          ? '<span class="ai-badge" style="margin-left:0.5rem">🤖 AI</span>'
+          : p.author_username
+            ? `<span class="ai-badge" style="margin-left:0.5rem;background:rgba(99,102,241,0.15);color:var(--primary-light);border:1px solid rgba(99,102,241,0.3)">👤 ${escHtml(p.author_username)}</span>`
+            : ''}
       </div>
       <h1 class="post-title">${escHtml(p.title)}</h1>
       <p class="post-subtitle">${escHtml(p.excerpt)}</p>
@@ -169,6 +173,7 @@ function renderPost(p) {
 
   const likedClass = p.liked_by_user ? 'liked' : '';
   const user = getUser();
+  const canEdit = user && (user.id === p.author_id || user.role === 'admin') && !p.ai_generated;
 
   document.getElementById('post-footer').innerHTML = `
     <div class="post-tags" style="flex:1">${tags}</div>
@@ -176,6 +181,8 @@ function renderPost(p) {
       ♥ <span id="like-btn-count">${p.like_count}</span> Like
     </button>
     <button class="btn btn-outline btn-sm" id="share-btn">↗ Share</button>
+    ${canEdit ? `<button class="btn btn-outline btn-sm" id="edit-post-btn">✏️ Edit</button>` : ''}
+    ${canEdit ? `<button class="btn btn-outline btn-sm" id="delete-post-btn" style="color:var(--danger)">🗑 Delete</button>` : ''}
     <a href="/" class="btn btn-outline btn-sm">← Back</a>
   `;
 
@@ -184,8 +191,47 @@ function renderPost(p) {
   sharePanelWrap.id = 'share-panel-wrap';
   document.getElementById('post-footer').after(sharePanelWrap);
 
+  // Edit post inline form (inserted after share panel)
+  const editPostWrap = document.createElement('div');
+  editPostWrap.id = 'edit-post-wrap';
+  sharePanelWrap.after(editPostWrap);
+
   document.getElementById('like-btn').addEventListener('click', handleLike);
   document.getElementById('share-btn').addEventListener('click', () => sharePost(p.title, postUrl));
+
+  document.getElementById('edit-post-btn')?.addEventListener('click', () => {
+    const wrap = document.getElementById('edit-post-wrap');
+    if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `
+      <div style="margin-top:1rem;padding:1.25rem;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r)">
+        <h4 style="margin-bottom:0.75rem">Edit Post</h4>
+        <textarea id="edit-post-content" rows="10" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem;color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;resize:vertical">${escHtml(p.content)}</textarea>
+        <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
+          <button class="btn btn-primary btn-sm" id="save-post-btn">Save</button>
+          <button class="btn btn-outline btn-sm" onclick="document.getElementById('edit-post-wrap').innerHTML=''">Cancel</button>
+        </div>
+      </div>`;
+    document.getElementById('save-post-btn').addEventListener('click', async () => {
+      const content = document.getElementById('edit-post-content').value.trim();
+      if (!content) return;
+      try {
+        await patch(`/posts/${slug}`, { content });
+        toast('Post updated');
+        wrap.innerHTML = '';
+        loadPost();
+      } catch (e) { toast(e.message || 'Failed to update', 'error'); }
+    });
+  });
+
+  document.getElementById('delete-post-btn')?.addEventListener('click', async () => {
+    const ok = await showModal({ title: 'Delete post', message: 'This will permanently delete your post. Are you sure?', confirmLabel: 'Delete', danger: true });
+    if (!ok) return;
+    try {
+      await del(`/posts/${slug}`);
+      toast('Post deleted');
+      setTimeout(() => window.location.href = '/', 800);
+    } catch (e) { toast(e.message || 'Failed to delete', 'error'); }
+  });
   document.getElementById('comments-section').style.display = 'block';
 }
 
@@ -262,7 +308,7 @@ function renderComment(c, isReply = false) {
             <span class="comment-username">${escHtml(c.username)}</span>
             <span class="comment-time">${timeAgo(c.created_at)}</span>
           </div>
-          <div class="comment-text">${escHtml(c.content)}</div>
+          <div class="comment-text">${linkify(c.content)}</div>
           <div class="comment-actions">
             ${!isReply && isLoggedIn() ? `<button class="comment-action" onclick="showReply(${c.id})">Reply</button>` : ''}
             ${canDelete ? `<button class="comment-action" onclick="editComment(${c.id}, ${JSON.stringify(c.content)})">Edit</button>` : ''}

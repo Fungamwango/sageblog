@@ -1,5 +1,6 @@
 import { json, error } from '../middleware/cors';
 import { requireAuth, requireAdmin } from '../middleware/auth';
+import { createNotification } from './notificationRoutes';
 import type { Env } from '../types';
 
 export async function handleComments(path: string, method: string, request: Request, env: Env): Promise<Response | null> {
@@ -68,6 +69,10 @@ export async function handleComments(path: string, method: string, request: Requ
     ).bind(post.id, user.sub, body.parent_id || null, body.content.trim()).run();
 
     await env.DB.prepare('UPDATE posts SET comment_count = comment_count + 1 WHERE id = ?').bind(post.id).run();
+
+    // Notify post author
+    const postInfo = await env.DB.prepare('SELECT title, slug FROM posts WHERE id = ?').bind(post.id).first<{ title: string; slug: string }>();
+    if (postInfo) createNotification(env.DB, user.sub, 'comment', post.id, postInfo.slug, postInfo.title, user.username || 'Someone');
 
     const newComment = await env.DB.prepare(
       `SELECT c.*, u.username FROM comments c JOIN users u ON c.user_id = u.id WHERE c.id = ?`

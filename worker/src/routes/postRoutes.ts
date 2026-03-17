@@ -16,11 +16,13 @@ export async function handlePosts(path: string, method: string, request: Request
     const tag = url.searchParams.get('tag');
     const search = url.searchParams.get('search');
     const sort = url.searchParams.get('sort');
+    const ai = url.searchParams.get('ai');
 
     let query = `
-      SELECT p.*, c.name as category_name, c.slug as category_slug
+      SELECT p.*, c.name as category_name, c.slug as category_slug, u.username as author_username
       FROM posts p
       LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN users u ON p.author_id = u.id
       WHERE p.status = 'published'
     `;
     const params: (string | number)[] = [];
@@ -31,6 +33,8 @@ export async function handlePosts(path: string, method: string, request: Request
       params.push(tag);
     }
     if (search) { query += ` AND (p.title LIKE ? OR p.excerpt LIKE ?)`; params.push(`%${search}%`, `%${search}%`); }
+    if (ai === '1') { query += ` AND p.ai_generated = 1`; }
+    else if (ai === '0') { query += ` AND p.ai_generated = 0`; }
 
     const countQuery = query.replace('SELECT p.*, c.name as category_name, c.slug as category_slug', 'SELECT COUNT(*) as total');
     const totalRow = await env.DB.prepare(countQuery).bind(...params).first<{ total: number }>();
@@ -55,8 +59,8 @@ export async function handlePosts(path: string, method: string, request: Request
   // GET /posts/featured
   if (method === 'GET' && path === '/posts/featured') {
     const rows = await env.DB.prepare(`
-      SELECT p.*, c.name as category_name, c.slug as category_slug
-      FROM posts p LEFT JOIN categories c ON p.category_id = c.id
+      SELECT p.*, c.name as category_name, c.slug as category_slug, u.username as author_username
+      FROM posts p LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN users u ON p.author_id = u.id
       WHERE p.status = 'published'
       ORDER BY p.like_count DESC, p.view_count DESC
       LIMIT 3
@@ -70,8 +74,8 @@ export async function handlePosts(path: string, method: string, request: Request
   if (method === 'GET' && slugMatch) {
     const slug = slugMatch[1];
     const post = await env.DB.prepare(`
-      SELECT p.*, c.name as category_name, c.slug as category_slug
-      FROM posts p LEFT JOIN categories c ON p.category_id = c.id
+      SELECT p.*, c.name as category_name, c.slug as category_slug, u.username as author_username
+      FROM posts p LEFT JOIN categories c ON p.category_id = c.id LEFT JOIN users u ON p.author_id = u.id
       WHERE p.slug = ? AND p.status = 'published'
     `).bind(slug).first<any>();
 
@@ -119,9 +123,40 @@ export async function handlePosts(path: string, method: string, request: Request
     return json({ id: result.meta.last_row_id }, 201, origin);
   }
 
-  // DELETE /posts/:id (admin)
+  // PATCH /posts/:slug — edit own post (or admin)
+  const slugEdit = path.match(/^\/posts\/([^/]+)$/);
+  if (method === 'PATCH' && slugEdit) {
+    const user = await requireAuth(request, env);
+    if (!user) return error('Unauthorized', 401, origin);
+    const existing = await env.DB.prepare('SELECT id, author_id FROM posts WHERE slug = ?').bind(slugEdit[1]).first<{ id: number; author_id: number }>();
+    if (!existing) return error('Not found', 404, origin);
+    if (existing.author_id !== user.sub && user.role !== 'admin') return error('Forbidden', 403, origin);
+    const body = await request.json<any>();
+    const content = body.content?.trim();
+    if (!content) return error('content required', 400, origin);
+    const rawText = content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const title = (body.title || rawText).substring(0, 70);
+    const excerpt = rawText.substring(0, 200);
+    await env.DB.prepare(`UPDATE posts SET content = ?, title = ?, excerpt = ?, updated_at = datetime('now') WHERE id = ?`)
+      .bind(content, title, excerpt, existing.id).run();
+    return json({ ok: true }, 200, origin);
+  }
+
+  // DELETE /posts/:slug — delete own post (or admin)
+  if (method === 'DELETE' && slugEdit) {
+    const user = await requireAuth(request, env);
+    if (!user) return error('Unauthorized', 401, origin);
+    const existing = await env.DB.prepare('SELECT id, author_id, ai_generated FROM posts WHERE slug = ?').bind(slugEdit[1]).first<{ id: number; author_id: number; ai_generated: number }>();
+    if (!existing) return error('Not found', 404, origin);
+    if (existing.author_id !== user.sub && user.role !== 'admin') return error('Forbidden', 403, origin);
+    if (existing.ai_generated && user.role !== 'admin') return error('Cannot delete AI posts', 403, origin);
+    await env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(existing.id).run();
+    return json({ ok: true }, 200, origin);
+  }
+
+  // DELETE /posts/:id (admin — legacy numeric id)
   const idMatch = path.match(/^\/posts\/(\d+)$/);
-  if (method === 'DELETE' && idMatch) {
+  if (method === 'DELETE' && idMatch && !slugEdit) {
     const admin = await requireAdmin(request, env);
     if (!admin) return error('Forbidden', 403, origin);
     await env.DB.prepare('DELETE FROM posts WHERE id = ?').bind(parseInt(idMatch[1])).run();

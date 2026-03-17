@@ -43,6 +43,11 @@
   <div class="container">
     <h1>Knowledge, <em>Synthesized by AI</em></h1>
     <p>Fresh, detailed articles on technology, science, business, health, culture, and environment — generated and published daily.</p>
+    <div id="hero-stats" style="display:flex;justify-content:center;gap:2rem;margin:1rem 0;flex-wrap:wrap">
+      <span style="font-size:0.875rem;color:var(--text-2)">🤖 AI Posts: <strong id="stat-ai" style="color:var(--primary-light)">…</strong></span>
+      <span style="font-size:0.875rem;color:var(--text-2)">✍️ User Posts: <strong id="stat-user" style="color:var(--primary-light)">…</strong></span>
+      <span style="font-size:0.875rem;color:var(--text-2)">📚 Total: <strong id="stat-total" style="color:var(--primary-light)">…</strong></span>
+    </div>
     <div class="flex items-center gap-2" style="justify-content:center;flex-wrap:wrap" id="category-pills"></div>
   </div>
 </section>
@@ -73,7 +78,7 @@
             <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;flex-wrap:wrap">
               <select id="qp-category" class="btn btn-outline btn-sm" style="padding:0.35rem 0.75rem"></select>
               <!-- Media attach -->
-              <label class="qp-attach-btn" title="image ≤25kb · video ≤10mb">
+              <label class="qp-attach-btn" title="image ≤60kb · video ≤10mb">
                 📷 🎬 <span>add image / video</span>
                 <input type="file" id="qp-file" accept="image/*,video/*" style="display:none">
               </label>
@@ -197,6 +202,22 @@ import { injectSiteLD } from '/assets/js/seo.js';
 injectSiteLD();
 updateHeaderAuth();
 
+// Hero post counts
+(async () => {
+  try {
+    const fmt = n => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : n;
+    const [ai, user] = await Promise.all([
+      get('/posts?limit=1&ai=1'),
+      get('/posts?limit=1&ai=0'),
+    ]);
+    const aiCount = ai.pagination.total;
+    const userCount = user.pagination.total;
+    document.getElementById('stat-ai').textContent = fmt(aiCount);
+    document.getElementById('stat-user').textContent = fmt(userCount);
+    document.getElementById('stat-total').textContent = fmt(aiCount + userCount);
+  } catch {}
+})();
+
 // Quick post box
 function showQpForm(user) {
   document.getElementById('qp-guest').style.display = 'none';
@@ -267,7 +288,7 @@ document.getElementById('qp-file')?.addEventListener('change', async e => {
   } else {
     setStatus('Compressing image…', 'info');
     try {
-      const blob = await compressImage(file, 25);
+      const blob = await compressImage(file, 60);
       qpAttachedFile = { blob, mime: 'image/jpeg', isVideo: false };
       setStatus(`${(blob.size/1024).toFixed(1)}kb ready`, 'ok');
       preview.style.display = 'block';

@@ -5,7 +5,7 @@ import type { Env } from '../types';
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 const VIDEO_MIMES = new Set(['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo']);
 
-const IMAGE_MAX = 30 * 1024;        // 30kb (server-side check; client compresses to 25kb)
+const IMAGE_MAX = 70 * 1024;        // 70kb (server-side check; client targets 60kb)
 const VIDEO_MAX = 10 * 1024 * 1024; // 10mb
 
 export async function handleImages(path: string, method: string, request: Request, env: Env): Promise<Response | null> {

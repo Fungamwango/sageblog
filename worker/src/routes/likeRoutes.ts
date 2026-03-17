@@ -1,5 +1,6 @@
 import { json, error } from '../middleware/cors';
 import { requireAuth } from '../middleware/auth';
+import { createNotification } from './notificationRoutes';
 import type { Env } from '../types';
 
 export async function handleLikes(path: string, method: string, request: Request, env: Env): Promise<Response | null> {
@@ -32,7 +33,8 @@ export async function handleLikes(path: string, method: string, request: Request
     } else {
       await env.DB.prepare('INSERT OR IGNORE INTO likes (user_id, post_id) VALUES (?, ?)').bind(user.sub, post.id).run();
       await env.DB.prepare('UPDATE posts SET like_count = like_count + 1 WHERE id = ?').bind(post.id).run();
-      const updated = await env.DB.prepare('SELECT like_count FROM posts WHERE id = ?').bind(post.id).first<{ like_count: number }>();
+      const updated = await env.DB.prepare('SELECT like_count, title, slug FROM posts WHERE id = ?').bind(post.id).first<{ like_count: number; title: string; slug: string }>();
+      createNotification(env.DB, user.sub, 'like', post.id, updated?.slug || slug, updated?.title || '', user.username || 'Someone');
       return json({ liked: true, like_count: updated?.like_count || 0 }, 200, origin);
     }
   }
