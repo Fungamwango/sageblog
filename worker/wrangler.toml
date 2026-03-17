@@ -1,0 +1,28 @@
+name = "sageblog-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+SITE_URL    = "https://sageblog.cfd"
+API_URL     = "https://api.sageblog.cfd"
+
+[triggers]
+crons = ["0 */6 * * *"]
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "sageblog-db"
+database_id   = "REPLACE_WITH_YOUR_D1_ID"
+
+[ai]
+binding = "AI"
+
+[[kv_namespaces]]
+binding = "KV_STORE"
+id      = "REPLACE_WITH_YOUR_KV_ID"
+
+# Secrets (set via wrangler secret put):
+#   JWT_SECRET
+#   ADMIN_SECRET
