@@ -1,3 +1,5 @@
+/sitemap.xml   https://api.sageblog.cfd/sitemap.xml  301
+/robots.txt    https://api.sageblog.cfd/robots.txt   301
 /post/*        /post.html     200
 /category/*    /category.html 200
 /tag/*         /tag.html      200

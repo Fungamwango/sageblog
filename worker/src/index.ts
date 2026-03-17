@@ -1,4 +1,4 @@
-import { handleOptions, json, error } from './middleware/cors';
+import { handleOptions, error } from './middleware/cors';
 import { handleAuth } from './routes/authRoutes';
 import { handlePosts } from './routes/postRoutes';
 import { handleComments } from './routes/commentRoutes';
@@ -6,11 +6,12 @@ import { handleLikes } from './routes/likeRoutes';
 import { handleTaxonomy } from './routes/taxonomyRoutes';
 import { handleAdmin } from './routes/adminRoutes';
 import { handleSEO } from './routes/seoRoutes';
+import { handleImages } from './routes/imageRoutes';
 import { handleScheduled } from './scheduled/cronHandler';
 import type { Env } from './types';
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
     // Proxy frontend requests (sageblog.cfd) to Pages
@@ -63,6 +64,9 @@ export default {
       if (response) return response;
 
       response = await handleTaxonomy(path, method, request, env);
+      if (response) return response;
+
+      response = await handleImages(path, method, request, env);
       if (response) return response;
 
       return error('Not Found', 404, origin);

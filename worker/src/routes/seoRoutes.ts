@@ -14,8 +14,8 @@ Sitemap: https://sageblog.cfd/sitemap.xml
 
   if (path === '/sitemap.xml') {
     const posts = await env.DB.prepare(
-      `SELECT slug, updated_at FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 1000`
-    ).all<{ slug: string; updated_at: string }>();
+      `SELECT slug, updated_at, featured_image, title, content FROM posts WHERE status = 'published' ORDER BY published_at DESC LIMIT 1000`
+    ).all<{ slug: string; updated_at: string; featured_image: string | null; title: string; content: string }>();
 
     const categories = await env.DB.prepare('SELECT slug FROM categories').all<{ slug: string }>();
     const tags = await env.DB.prepare(
@@ -34,11 +34,29 @@ Sitemap: https://sageblog.cfd/sitemap.xml
     }
     for (const post of posts.results) {
       const lastmod = post.updated_at.substring(0, 10);
-      urls += `\n  <url><loc>${base}/post/${post.slug}</loc><lastmod>${lastmod}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`;
+      const safeTitle = post.title.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      // Extract first image from content or featured_image
+      const imgFromContent = post.content?.match(/<img[^>]+src="([^"]+)"/i)?.[1];
+      const imgUrl = post.featured_image
+        ? `${base}${post.featured_image}`
+        : imgFromContent
+          ? (imgFromContent.startsWith('/images/') ? `https://api.sageblog.cfd${imgFromContent}` : imgFromContent)
+          : null;
+      const imgTag = imgUrl
+        ? `\n    <image:image><image:loc>${imgUrl}</image:loc><image:title>${safeTitle}</image:title></image:image>`
+        : '';
+      // Video tag
+      const vidUrl = post.content?.match(/<video[^>]+src="([^"]+)"/i)?.[1];
+      const vidTag = vidUrl
+        ? `\n    <video:video><video:content_loc>${vidUrl.startsWith('/images/') ? 'https://api.sageblog.cfd' + vidUrl : vidUrl}</video:content_loc><video:title>${safeTitle}</video:title></video:video>`
+        : '';
+      urls += `\n  <url><loc>${base}/post/${post.slug}</loc><lastmod>${lastmod}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority>${imgTag}${vidTag}</url>`;
     }
 
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">${urls}
 </urlset>`;
 
     return new Response(xml, {

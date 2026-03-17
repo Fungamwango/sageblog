@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||'dark'</script>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Loading… — SageBlog</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
   
@@ -68,10 +69,12 @@
 <aside style="background:var(--bg-card);border-top:1px solid var(--border);padding:2.5rem 0;margin-top:2rem">
   <div class="container">
     <div class="section-header">
-      <h3 class="section-title">More Posts</h3>
-      <a href="/" class="section-link">View all →</a>
+      <h3 class="section-title">Popular Posts</h3>
     </div>
-    <div class="post-grid" id="related-posts"></div>
+    <div class="post-grid" id="popular-posts"></div>
+    <div style="text-align:center;margin-top:2rem">
+      <a href="/" class="btn btn-outline">See all posts →</a>
+    </div>
   </div>
 </aside>
 
@@ -85,10 +88,10 @@
 </footer>
 
 <script type="module">
-import { get, post, del } from '/assets/js/api.js';
+import { get, post, del, patch } from '/assets/js/api.js';
 import { updateHeaderAuth, isLoggedIn, getUser } from '/assets/js/auth.js';
-import { escHtml, timeAgo, formatDate, slugFromPath, toast, renderPostCard } from '/assets/js/utils.js';
-import { setMeta, injectArticleLD } from '/assets/js/seo.js';
+import { escHtml, timeAgo, formatDate, slugFromPath, toast, renderPostCard, mdToHtml } from '/assets/js/utils.js';
+import { setMeta, injectArticleLD, extractMedia } from '/assets/js/seo.js';
 
 updateHeaderAuth();
 
@@ -104,7 +107,7 @@ async function loadPost() {
     postData = p;
     renderPost(p);
     loadComments();
-    loadRelated(p.category_slug);
+    loadPopular();
   } catch {
     document.getElementById('post-wrap').innerHTML = `
       <div class="container-narrow" style="padding:4rem 1.5rem;text-align:center">
@@ -116,19 +119,26 @@ async function loadPost() {
 }
 
 function renderPost(p) {
+  const { image: mediaImage, video: mediaVideo } = extractMedia(p.content);
+  const postUrl = `https://sageblog.cfd/post/${p.slug}`;
+
   setMeta({
     title: p.meta_title || p.title,
     description: p.meta_desc || p.excerpt,
-    url: `https://sageblog.cfd/post/${p.slug}`,
+    url: postUrl,
     type: 'article',
+    image: mediaImage,
+    video: mediaVideo,
   });
 
   injectArticleLD({
     title: p.title,
     description: p.excerpt,
-    url: `https://sageblog.cfd/post/${p.slug}`,
+    url: postUrl,
     publishedAt: p.published_at,
     modifiedAt: p.updated_at,
+    image: mediaImage,
+    video: mediaVideo,
   });
 
   document.querySelector('.post-hero').innerHTML = `
@@ -149,7 +159,8 @@ function renderPost(p) {
     </div>
   `;
 
-  document.getElementById('post-content').innerHTML = p.content;
+
+  document.getElementById('post-content').innerHTML = mdToHtml(p.content);
 
   // Post footer: tags + like
   const tags = (p.tags || []).map(t =>
@@ -157,15 +168,24 @@ function renderPost(p) {
   ).join('');
 
   const likedClass = p.liked_by_user ? 'liked' : '';
+  const user = getUser();
+
   document.getElementById('post-footer').innerHTML = `
     <div class="post-tags" style="flex:1">${tags}</div>
     <button class="like-btn ${likedClass}" id="like-btn" ${!isLoggedIn() ? 'title="Login to like"' : ''}>
       ♥ <span id="like-btn-count">${p.like_count}</span> Like
     </button>
+    <button class="btn btn-outline btn-sm" id="share-btn">↗ Share</button>
     <a href="/" class="btn btn-outline btn-sm">← Back</a>
   `;
 
+  // Share panel (inserted after footer)
+  const sharePanelWrap = document.createElement('div');
+  sharePanelWrap.id = 'share-panel-wrap';
+  document.getElementById('post-footer').after(sharePanelWrap);
+
   document.getElementById('like-btn').addEventListener('click', handleLike);
+  document.getElementById('share-btn').addEventListener('click', () => sharePost(p.title, postUrl));
   document.getElementById('comments-section').style.display = 'block';
 }
 
@@ -245,8 +265,10 @@ function renderComment(c, isReply = false) {
           <div class="comment-text">${escHtml(c.content)}</div>
           <div class="comment-actions">
             ${!isReply && isLoggedIn() ? `<button class="comment-action" onclick="showReply(${c.id})">Reply</button>` : ''}
-            ${canDelete ? `<button class="comment-action" style="color:var(--danger)" onclick="deleteComment(${c.id}, ${postData?.id})">Delete</button>` : ''}
+            ${canDelete ? `<button class="comment-action" onclick="editComment(${c.id}, ${JSON.stringify(c.content)})">Edit</button>` : ''}
+            ${canDelete ? `<button class="comment-action" style="color:var(--red)" onclick="deleteComment(${c.id})">Delete</button>` : ''}
           </div>
+          <div id="edit-form-${c.id}"></div>
           <div id="reply-form-${c.id}"></div>
         </div>
         ${replies ? `<div class="comment-replies">${replies}</div>` : ''}
@@ -279,14 +301,64 @@ window.submitReply = async (parentId) => {
   }
 };
 
+// ── Custom modal ────────────────────────────────────────────────
+function showModal({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false }) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box" role="dialog" aria-modal="true">
+        <p class="modal-title">${escHtml(title)}</p>
+        <p class="modal-message">${escHtml(message)}</p>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-sm" id="modal-cancel">${escHtml(cancelLabel)}</button>
+          <button class="btn btn-sm ${danger ? 'btn-danger' : 'btn-primary'}" id="modal-confirm">${escHtml(confirmLabel)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('modal-visible'));
+    const close = val => { overlay.classList.remove('modal-visible'); setTimeout(() => overlay.remove(), 200); resolve(val); };
+    overlay.querySelector('#modal-confirm').addEventListener('click', () => close(true));
+    overlay.querySelector('#modal-cancel').addEventListener('click', () => close(false));
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
+  });
+}
+
 window.deleteComment = async (id) => {
-  if (!confirm('Delete this comment?')) return;
+  const ok = await showModal({ title: 'Delete comment', message: 'This cannot be undone. Are you sure?', confirmLabel: 'Delete', danger: true });
+  if (!ok) return;
   try {
     await del(`/comments/${id}`);
     toast('Comment deleted');
     fetchComments(commentsPage);
   } catch {
     toast('Failed to delete comment', 'error');
+  }
+};
+
+window.editComment = async (id, current) => {
+  const wrap = document.getElementById(`edit-form-${id}`);
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <div style="margin-top:0.5rem">
+      <textarea id="edit-input-${id}" rows="2" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0.5rem;color:var(--text);font-family:inherit;font-size:0.875rem;outline:none;resize:vertical">${escHtml(current)}</textarea>
+      <div style="display:flex;gap:0.5rem;margin-top:0.4rem">
+        <button class="btn btn-primary btn-sm" onclick="saveEdit(${id})">Save</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('edit-form-${id}').innerHTML=''">Cancel</button>
+      </div>
+    </div>`;
+};
+
+window.saveEdit = async (id) => {
+  const input = document.getElementById(`edit-input-${id}`);
+  const content = input?.value?.trim();
+  if (!content) return;
+  try {
+    await patch(`/comments/${id}`, { content });
+    toast('Comment updated');
+    fetchComments(commentsPage);
+  } catch (e) {
+    toast(e.message || 'Failed to update', 'error');
   }
 };
 
@@ -310,12 +382,41 @@ async function submitComment() {
   }
 }
 
-async function loadRelated(categorySlug) {
-  if (!categorySlug) return;
+async function sharePost(title, url) {
+  if (navigator.share) {
+    try { await navigator.share({ title, text: title, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  }
+  // Show share panel
+  const wrap = document.getElementById('share-panel-wrap');
+  if (wrap.innerHTML) { wrap.innerHTML = ''; return; }
+  const enc = encodeURIComponent;
+  const platforms = [
+    { name: 'X / Twitter', icon: '𝕏', href: `https://twitter.com/intent/tweet?text=${enc(title)}&url=${enc(url)}` },
+    { name: 'Facebook',    icon: 'f', href: `https://www.facebook.com/sharer/sharer.php?u=${enc(url)}` },
+    { name: 'LinkedIn',    icon: 'in', href: `https://www.linkedin.com/shareArticle?mini=true&url=${enc(url)}&title=${enc(title)}` },
+    { name: 'WhatsApp',    icon: '✉', href: `https://wa.me/?text=${enc(title + ' ' + url)}` },
+    { name: 'Telegram',    icon: '✈', href: `https://t.me/share/url?url=${enc(url)}&text=${enc(title)}` },
+    { name: 'Reddit',      icon: '↑', href: `https://reddit.com/submit?url=${enc(url)}&title=${enc(title)}` },
+  ];
+  wrap.style.cssText = 'padding:0.75rem 0;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center';
+  wrap.innerHTML = `
+    <span style="font-size:0.8rem;color:var(--text-3);margin-right:0.25rem">Share:</span>
+    ${platforms.map(p => `<a href="${escHtml(p.href)}" target="_blank" rel="noopener" class="btn btn-outline btn-sm" style="font-size:0.75rem">${escHtml(p.icon)} ${escHtml(p.name)}</a>`).join('')}
+    <button class="btn btn-outline btn-sm" id="copy-link-btn" style="font-size:0.75rem">🔗 Copy link</button>
+  `;
+  document.getElementById('copy-link-btn').addEventListener('click', async () => {
+    await navigator.clipboard.writeText(url);
+    toast('Link copied!');
+  });
+}
+
+async function loadPopular() {
   try {
-    const data = await get(`/posts?category=${categorySlug}&limit=3`);
-    const others = data.posts.filter(p => p.slug !== slug).slice(0, 3);
-    document.getElementById('related-posts').innerHTML = others.map(renderPostCard).join('');
+    const data = await get(`/posts?sort=views&limit=11`);
+    const others = data.posts.filter(p => p.slug !== slug).slice(0, 10);
+    document.getElementById('popular-posts').innerHTML = others.length
+      ? others.map(renderPostCard).join('')
+      : '';
   } catch {}
 }
 

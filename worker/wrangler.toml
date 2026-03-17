@@ -9,7 +9,7 @@ SITE_URL    = "https://sageblog.cfd"
 API_URL     = "https://api.sageblog.cfd"
 
 [triggers]
-crons = ["0 */6 * * *"]
+crons = ["*/10 * * * *"]
 
 [[d1_databases]]
 binding       = "DB"
@@ -22,6 +22,10 @@ binding = "AI"
 [[kv_namespaces]]
 binding = "KV_STORE"
 id      = "ecea8cf5e8e04313b738497c18f6927f"
+
+[[r2_buckets]]
+binding     = "IMAGES"
+bucket_name = "sageblog-images"
 
 [[routes]]
 pattern = "api.sageblog.cfd"

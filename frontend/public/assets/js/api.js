@@ -59,3 +59,10 @@ export async function del(path) {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
+
+export async function patch(path, body) {
+  const res = await apiFetch(path, { method: 'PATCH', body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) throw Object.assign(new Error(data.error || 'Request failed'), { status: res.status });
+  return data;
+}

@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||'dark'</script>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>SageBlog — AI-Powered Knowledge Blog</title>
   <meta name="description" content="SageBlog delivers AI-generated articles on technology, science, business, health, culture, and environment. Fresh insights every day.">
   <link rel="canonical" href="https://sageblog.cfd/">
@@ -48,6 +49,41 @@
 
 <main>
   <div class="container">
+
+    <!-- Quick Post Box -->
+    <div class="quick-post-box" id="quick-post-box">
+      <div id="qp-guest">
+        <p style="color:var(--text-2);font-size:0.9rem;margin-bottom:0.75rem">Have something to share? Pick a username to get started.</p>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+          <input type="text" id="qp-username" placeholder="Choose a username…" maxlength="30"
+            style="flex:1;min-width:160px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem 0.875rem;color:var(--text);font-family:var(--font);font-size:0.875rem;outline:none">
+          <button class="btn btn-primary btn-sm" id="qp-join-btn">Join & Post</button>
+          <span id="qp-join-error" style="font-size:0.8rem;color:var(--red)"></span>
+        </div>
+        <!-- hidden textarea shown after joining inline -->
+        <div id="qp-after-join" style="display:none;margin-top:0.75rem"></div>
+      </div>
+      <div id="qp-form" style="display:none">
+        <div style="display:flex;gap:0.75rem;align-items:flex-start">
+          <div class="qp-avatar" id="qp-avatar">?</div>
+          <div style="flex:1">
+            <textarea id="qp-textarea" placeholder="Share a thought, question, or insight…" rows="3"></textarea>
+            <!-- Media preview -->
+            <div id="qp-preview" class="qp-preview" style="display:none"></div>
+            <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;flex-wrap:wrap">
+              <select id="qp-category" class="btn btn-outline btn-sm" style="padding:0.35rem 0.75rem"></select>
+              <!-- Media attach -->
+              <label class="qp-attach-btn" title="image ≤25kb · video ≤10mb">
+                📷 🎬 <span>add image / video</span>
+                <input type="file" id="qp-file" accept="image/*,video/*" style="display:none">
+              </label>
+              <button class="btn btn-primary btn-sm" id="qp-submit">Post</button>
+              <span id="qp-status" class="qp-status"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Featured Posts -->
     <section class="section" id="featured-section">
@@ -154,12 +190,161 @@
 
 <script type="module">
 import { get } from '/assets/js/api.js';
-import { updateHeaderAuth } from '/assets/js/auth.js';
-import { renderPostCard, renderSkeleton, escHtml, debounce, getParam, setParam } from '/assets/js/utils.js';
+import { updateHeaderAuth, getUser } from '/assets/js/auth.js';
+import { renderPostCard, renderSkeleton, escHtml, debounce, getParam, setParam, compressImage } from '/assets/js/utils.js';
 import { injectSiteLD } from '/assets/js/seo.js';
 
 injectSiteLD();
 updateHeaderAuth();
+
+// Quick post box
+function showQpForm(user) {
+  document.getElementById('qp-guest').style.display = 'none';
+  document.getElementById('qp-form').style.display = 'block';
+  document.getElementById('qp-avatar').textContent = user.username.slice(0, 2).toUpperCase();
+}
+
+(function initQuickPost() {
+  const user = getUser();
+  if (user) showQpForm(user);
+})();
+
+// Inline join for guests
+document.getElementById('qp-join-btn')?.addEventListener('click', async () => {
+  const username = document.getElementById('qp-username').value.trim();
+  const errEl = document.getElementById('qp-join-error');
+  errEl.textContent = '';
+  if (!username || username.length < 2) { errEl.textContent = 'At least 2 characters'; return; }
+  const btn = document.getElementById('qp-join-btn');
+  btn.disabled = true; btn.textContent = 'Joining…';
+  try {
+    const { quickLogin } = await import('/assets/js/auth.js');
+    const user = await quickLogin(username);
+    showQpForm(user);
+    updateHeaderAuth();
+  } catch (e) {
+    errEl.textContent = e.message;
+  } finally { btn.disabled = false; btn.textContent = 'Join & Post'; }
+});
+
+get('/categories').then(cats => {
+  const sel = document.getElementById('qp-category');
+  if (sel) sel.innerHTML = cats.map(c => `<option value="${escHtml(c.id)}">${escHtml(c.name)}</option>`).join('');
+}).catch(() => {});
+
+// Status helper: type = 'info' | 'ok' | 'warn' | 'error'
+let _statusTimer = null;
+function setStatus(msg, type = 'info') {
+  const el = document.getElementById('qp-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `qp-status qp-status--${type}`;
+  clearTimeout(_statusTimer);
+  if (msg && (type === 'warn' || type === 'error' || type === 'ok')) {
+    _statusTimer = setTimeout(() => { el.textContent = ''; el.className = 'qp-status'; }, 3000);
+  }
+}
+
+// Quick post: media attach + preview
+let qpAttachedFile = null; // { blob, mime, isVideo }
+
+document.getElementById('qp-file')?.addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('qp-status');
+  const preview = document.getElementById('qp-preview');
+
+  const isVideo = file.type.startsWith('video/');
+  const isImage = file.type.startsWith('image/');
+  if (!isImage && !isVideo) { setStatus('Only images and videos are supported', 'warn'); return; }
+
+  if (isVideo) {
+    if (file.size > 10 * 1024 * 1024) { setStatus('⚠ Video must be under 10mb', 'warn'); e.target.value = ''; return; }
+    qpAttachedFile = { blob: file, mime: file.type, isVideo: true };
+    setStatus(`${file.name} · ${(file.size/1024/1024).toFixed(1)}mb`, 'ok');
+    preview.style.display = 'block';
+    preview.innerHTML = `<video src="${URL.createObjectURL(file)}" controls class="qp-media-preview"></video><button class="qp-remove-media" id="qp-remove">✕</button>`;
+  } else {
+    setStatus('Compressing image…', 'info');
+    try {
+      const blob = await compressImage(file, 25);
+      qpAttachedFile = { blob, mime: 'image/jpeg', isVideo: false };
+      setStatus(`${(blob.size/1024).toFixed(1)}kb ready`, 'ok');
+      preview.style.display = 'block';
+      preview.innerHTML = `<img src="${URL.createObjectURL(blob)}" class="qp-media-preview"><button class="qp-remove-media" id="qp-remove">✕</button>`;
+    } catch { setStatus('Image compression failed', 'error'); }
+  }
+
+  document.getElementById('qp-remove')?.addEventListener('click', () => {
+    qpAttachedFile = null;
+    preview.style.display = 'none';
+    preview.innerHTML = '';
+    setStatus('', 'info');
+    e.target.value = '';
+  });
+});
+
+document.getElementById('qp-submit')?.addEventListener('click', async () => {
+  const text = document.getElementById('qp-textarea').value.trim();
+  if (!text && !qpAttachedFile) { setStatus('⚠ Write something before posting', 'warn'); return; }
+  if (text && text.length < 10) { setStatus('⚠ Text must be at least 10 characters', 'warn'); return; }
+  const status = document.getElementById('qp-status');
+  const btn = document.getElementById('qp-submit');
+  const catId = document.getElementById('qp-category')?.value;
+  btn.disabled = true; setStatus('Posting…', 'info');
+
+  try {
+    const token = localStorage.getItem('access_token');
+    const API = 'https://api.sageblog.cfd';
+    let mediaHtml = '';
+
+    // Upload media first if attached
+    if (qpAttachedFile) {
+      setStatus(qpAttachedFile.isVideo ? 'Uploading video…' : 'Uploading image…', 'info');
+      const base64 = await blobToBase64(qpAttachedFile.blob);
+      const upRes = await fetch(`${API}/images/upload`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ data: base64, mime: qpAttachedFile.mime }),
+      });
+      if (!upRes.ok) { const e = await upRes.json(); throw new Error(e.error || 'Upload failed'); }
+      const { url } = await upRes.json();
+      const fullUrl = `${API}${url}`;
+      mediaHtml = qpAttachedFile.isVideo
+        ? `<div class="post-media"><video src="${escHtml(fullUrl)}" controls preload="metadata"></video></div>`
+        : `<div class="post-media"><img src="${escHtml(fullUrl)}" alt="attached image" loading="lazy"></div>`;
+    }
+
+    const content = [text ? `<p>${escHtml(text)}</p>` : '', mediaHtml].filter(Boolean).join('\n');
+    setStatus('Posting…', 'info');
+    const res = await fetch(`${API}/posts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ content, category_id: parseInt(catId) || 1 }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
+
+    // Reset form
+    document.getElementById('qp-textarea').value = '';
+    document.getElementById('qp-preview').style.display = 'none';
+    document.getElementById('qp-preview').innerHTML = '';
+    document.getElementById('qp-file').value = '';
+    qpAttachedFile = null;
+    setStatus('✓ Posted!', 'ok');
+    setTimeout(() => { setStatus('', 'info'); loadPosts(); }, 1000);
+  } catch (e) {
+    setStatus(e.message, 'error');
+  } finally { btn.disabled = false; }
+});
+
+function blobToBase64(blob) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
 
 let currentPage = parseInt(getParam('page') || '1');
 let currentCategory = getParam('category') || '';

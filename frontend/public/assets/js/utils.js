@@ -54,6 +54,81 @@ export function toast(message, type = 'success', duration = 3500) {
   setTimeout(() => el.remove(), duration);
 }
 
+/** Convert markdown text to HTML. Passes through already-valid HTML untouched. */
+export function mdToHtml(raw) {
+  if (!raw) return '';
+  // If content looks like clean HTML (starts with a block tag), return as-is
+  if (/^\s*<(p|h[1-6]|ul|ol|div|section|blockquote)[\s>]/i.test(raw)) return raw;
+
+  const lines = raw.split('\n');
+  const out = [];
+  let inUl = false, inOl = false;
+
+  const closeList = () => {
+    if (inUl) { out.push('</ul>'); inUl = false; }
+    if (inOl) { out.push('</ol>'); inOl = false; }
+  };
+
+  const inline = s => s
+    .replace(/<\d+>/g, '')                                     // strip <2> artefacts
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    .replace(/\*([^*\n]+?)\*/g, '<em>$1</em>')
+    .replace(/_([^_\n]+?)_/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^\*\s*/, '').trim();
+
+  for (let line of lines) {
+    line = line.replace(/<br\s*\/?>/gi, '').trim();
+    if (!line) { closeList(); out.push(''); continue; }
+
+    // Pass through existing HTML block elements
+    if (/^<(h[1-6]|p|ul|ol|li|blockquote|div|pre|table)[\s>]/i.test(line)) {
+      closeList(); out.push(line); continue;
+    }
+    // Headings
+    const hm = line.match(/^(#{1,6})\s+(.+)/);
+    if (hm) { closeList(); const lvl = Math.min(hm[1].length + 1, 4); out.push(`<h${lvl}>${inline(hm[2])}</h${lvl}>`); continue; }
+    // Blockquote
+    if (line.startsWith('> ')) { closeList(); out.push(`<blockquote><p>${inline(line.slice(2))}</p></blockquote>`); continue; }
+    // Ordered list
+    const olm = line.match(/^\d+\.\s+(.+)/);
+    if (olm) { if (!inOl) { if (inUl) { out.push('</ul>'); inUl = false; } out.push('<ol>'); inOl = true; } out.push(`<li>${inline(olm[1])}</li>`); continue; }
+    // Unordered list
+    const ulm = line.match(/^[-*•]\s+(.+)/);
+    if (ulm) { if (!inUl) { if (inOl) { out.push('</ol>'); inOl = false; } out.push('<ul>'); inUl = true; } out.push(`<li>${inline(ulm[1])}</li>`); continue; }
+    // HR
+    if (/^[-*_]{3,}$/.test(line)) { closeList(); out.push('<hr>'); continue; }
+    // Paragraph
+    closeList();
+    const text = inline(line);
+    if (text) out.push(`<p>${text}</p>`);
+  }
+  closeList();
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function compressImage(file, maxKb = 20) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      // Scale dimensions so estimated JPEG output fits within maxKb
+      const maxPx = (maxKb * 1024) / 2.5;
+      const ratio = Math.min(1, Math.sqrt(maxPx / (img.width * img.height)));
+      canvas.width = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compression failed')), 'image/jpeg', 0.75);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
 export function debounce(fn, delay) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };

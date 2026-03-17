@@ -76,8 +76,23 @@ export async function handleComments(path: string, method: string, request: Requ
     return json(newComment, 201, origin);
   }
 
-  // DELETE /comments/:id
+  // PATCH /comments/:id — edit
   const commentId = path.match(/^\/comments\/(\d+)$/);
+  if (method === 'PATCH' && commentId) {
+    const user = await requireAuth(request, env);
+    if (!user) return error('Unauthorized', 401, origin);
+    const comment = await env.DB.prepare('SELECT * FROM comments WHERE id = ?')
+      .bind(parseInt(commentId[1])).first<any>();
+    if (!comment) return error('Comment not found', 404, origin);
+    if (comment.user_id !== user.sub && user.role !== 'admin') return error('Forbidden', 403, origin);
+    const body = await request.json<{ content: string }>();
+    if (!body.content?.trim()) return error('Content is required', 400, origin);
+    await env.DB.prepare('UPDATE comments SET content = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      .bind(body.content.trim(), comment.id).run();
+    return json({ ok: true }, 200, origin);
+  }
+
+  // DELETE /comments/:id
   if (method === 'DELETE' && commentId) {
     const user = await requireAuth(request, env);
     if (!user) return error('Unauthorized', 401, origin);

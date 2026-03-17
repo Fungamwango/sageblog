@@ -1,7 +1,7 @@
 import { generatePost, getNextCategory } from '../services/aiGenerator';
 import type { Env } from '../types';
 
-export async function handleScheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
+export async function handleScheduled(_event: ScheduledController, env: Env, _ctx: ExecutionContext): Promise<void> {
   console.log('[cron] Starting scheduled AI post generation');
 
   const cat = await getNextCategory(env);

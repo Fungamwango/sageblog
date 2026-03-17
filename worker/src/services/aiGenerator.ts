@@ -1,6 +1,101 @@
 import type { Env, GeneratedPost } from '../types';
 import { uniqueSlug, slugify } from './slugify';
 
+/**
+ * Convert markdown-flavoured text to clean HTML.
+ * Handles: headings, bold, italic, lists (- / * / numbered), blockquotes,
+ * paragraphs, and strips model artefacts like <2>, <br />, stray asterisks.
+ */
+function mdToHtml(raw: string): string {
+  const lines = raw.split('\n');
+  const out: string[] = [];
+  let inUl = false, inOl = false;
+
+  const closeList = () => {
+    if (inUl) { out.push('</ul>'); inUl = false; }
+    if (inOl) { out.push('</ol>'); inOl = false; }
+  };
+
+  const inline = (s: string) => s
+    // Strip model noise artefacts: <2>, <1>, stray angle-number combos
+    .replace(/<\d+>/g, '')
+    // Bold+italic
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.+?)__/g, '<strong>$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // Trim leftover lone asterisks at line start
+    .replace(/^\*\s*/, '')
+    .trim();
+
+  for (let line of lines) {
+    // Strip <br />, <br/> leftovers
+    line = line.replace(/<br\s*\/?>/gi, '').trim();
+    if (!line) { closeList(); out.push(''); continue; }
+
+    // Already-valid HTML block elements — pass through
+    if (/^<(h[1-6]|p|ul|ol|li|blockquote|div|section|article|pre|table|thead|tbody|tr|th|td)[\s>]/.test(line)) {
+      closeList();
+      out.push(line);
+      continue;
+    }
+
+    // Headings
+    const hm = line.match(/^(#{1,6})\s+(.+)/);
+    if (hm) {
+      closeList();
+      const level = Math.min(hm[1].length + 1, 4); // h2–h4 (h1 is the post title)
+      out.push(`<h${level}>${inline(hm[2])}</h${level}>`);
+      continue;
+    }
+
+    // Blockquote
+    if (line.startsWith('> ')) {
+      closeList();
+      out.push(`<blockquote><p>${inline(line.slice(2))}</p></blockquote>`);
+      continue;
+    }
+
+    // Numbered list
+    const olm = line.match(/^\d+\.\s+(.+)/);
+    if (olm) {
+      if (!inOl) { if (inUl) { out.push('</ul>'); inUl = false; } out.push('<ol>'); inOl = true; }
+      out.push(`<li>${inline(olm[1])}</li>`);
+      continue;
+    }
+
+    // Unordered list (-, *, •)
+    const ulm = line.match(/^[-*•]\s+(.+)/);
+    if (ulm) {
+      if (!inUl) { if (inOl) { out.push('</ol>'); inOl = false; } out.push('<ul>'); inUl = true; }
+      out.push(`<li>${inline(ulm[1])}</li>`);
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^[-*_]{3,}$/.test(line)) { closeList(); out.push('<hr>'); continue; }
+
+    // Regular paragraph line
+    closeList();
+    const text = inline(line);
+    if (text) out.push(`<p>${text}</p>`);
+  }
+
+  closeList();
+
+  // Merge consecutive <p> blocks that are probably split sentences
+  return out.join('\n')
+    .replace(/<\/p>\n<p>/g, '</p>\n<p>')
+    // Clean up blank lines between HTML elements
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 const TOPICS: Record<string, string[]> = {
@@ -65,14 +160,17 @@ IMPORTANT: You must respond using EXACTLY this format with these exact delimiter
 (full HTML content here)
 ===END===`;
 
-  const userPrompt = `Write a detailed blog post about: "${topic}" in the ${categorySlug} category.
-${recentTitles.length > 0 ? `Avoid these recent topics: ${recentTitles.slice(0, 4).join('; ')}` : ''}
+  const userPrompt = `Write a unique, detailed blog post about: "${topic}" in the ${categorySlug} category.
+${recentTitles.length > 0 ? `IMPORTANT: These titles already exist — do NOT repeat or closely paraphrase them:\n${recentTitles.join('\n')}` : ''}
 
-Title: Compelling and specific (under 70 chars)
+Title rules:
+- Compelling and specific (under 70 chars)
+- NEVER include years like 2024, 2025, 2026 or phrases like "in [year]", "for [year]"
+- Must be meaningfully different from any existing title above
 Slug: URL-friendly version of the title
 Excerpt: 150-200 character engaging summary
 Tags: 4-5 relevant tags, comma-separated
-Meta_title: SEO optimized, under 60 chars
+Meta_title: SEO optimized, under 60 chars, no year
 Meta_desc: 150-160 chars, complete sentence
 Read_time: estimated minutes (number only)
 Content: 900-1400 words using HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>
@@ -106,7 +204,12 @@ Include at least 3 sections with <h2> headings.`;
     return null;
   }
 
+  // Strip year references from title (e.g. "Best X in 2025", "Top Y for 2024")
+  parsed.title = parsed.title.replace(/\s+(in|for)\s+20\d{2}\b/gi, '').replace(/\b20\d{2}\b/g, '').trim().replace(/\s+/g, ' ');
+
   const slug = await uniqueSlug(env.DB, parsed.slug || parsed.title);
+  // Convert markdown to HTML if the model returned markdown instead of HTML
+  parsed.content = mdToHtml(parsed.content);
 
   // Insert post
   const postResult = await env.DB.prepare(`
@@ -143,7 +246,7 @@ Include at least 3 sections with <h2> headings.`;
 
 async function getRecentTitles(db: D1Database, categoryId: number): Promise<string[]> {
   const rows = await db.prepare(
-    `SELECT title FROM posts WHERE category_id = ? ORDER BY created_at DESC LIMIT 8`
+    `SELECT title FROM posts WHERE category_id = ? ORDER BY created_at DESC LIMIT 100`
   ).bind(categoryId).all<{ title: string }>();
   return rows.results.map(r => r.title);
 }

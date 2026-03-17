@@ -1,145 +1,103 @@
 <!DOCTYPE html>
 <html lang="en">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||'dark'</script>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign In — SageBlog</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Join — SageBlog</title>
   <meta name="robots" content="noindex">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
-  
-  
   <link rel="stylesheet" href="/assets/css/main.css">
 </head>
 <body>
 
 <div class="auth-wrap">
   <div class="auth-card">
-    <a href="/" class="site-logo" style="justify-content:center;display:flex;margin-bottom:1.5rem">🔮 Sage<span>Blog</span></a>
-
-    <div id="mode-toggle" style="display:flex;background:var(--bg);border-radius:8px;padding:4px;margin-bottom:1.5rem">
-      <button class="btn w-full" id="tab-login" style="background:var(--bg-card)">Sign In</button>
-      <button class="btn w-full" id="tab-register" style="background:transparent;color:var(--text-muted)">Register</button>
+    <div style="position:absolute;top:1rem;right:1rem">
+      <button class="theme-toggle" id="theme-toggle-btn"></button>
     </div>
 
-    <!-- Login Form -->
-    <form id="login-form">
+    <a href="/" class="site-logo" style="justify-content:center;display:flex;margin-bottom:0.5rem">🔮 Sage<span>Blog</span></a>
+    <p style="text-align:center;font-size:0.875rem;color:var(--text-2);margin-bottom:1.75rem">Pick a username to join the conversation</p>
+
+    <form id="join-form">
       <div class="form-group">
-        <label for="login-email">Email</label>
-        <input type="email" id="login-email" placeholder="you@example.com" required>
+        <label for="username-input">Username</label>
+        <input type="text" id="username-input" placeholder="e.g. curiousreader" required minlength="2" maxlength="30" autocomplete="username" autofocus>
+        <div style="font-size:0.75rem;color:var(--text-3);margin-top:0.35rem">Letters, numbers, spaces, - and _ only. No password needed.</div>
       </div>
-      <div class="form-group">
-        <label for="login-password">Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" required>
-      </div>
-      <div id="login-error" class="form-error"></div>
-      <button type="submit" class="btn btn-primary w-full" style="margin-top:0.5rem">Sign In</button>
+      <div id="join-error" class="form-error"></div>
+      <button type="submit" class="btn btn-primary w-full" style="margin-top:0.75rem">Continue →</button>
     </form>
 
-    <!-- Register Form -->
-    <form id="register-form" class="hidden">
-      <div class="form-group">
-        <label for="reg-username">Username</label>
-        <input type="text" id="reg-username" placeholder="johndoe" required minlength="3" maxlength="30">
-      </div>
-      <div class="form-group">
-        <label for="reg-email">Email</label>
-        <input type="email" id="reg-email" placeholder="you@example.com" required>
-      </div>
-      <div class="form-group">
-        <label for="reg-password">Password</label>
-        <input type="password" id="reg-password" placeholder="Min 8 characters" required minlength="8">
-      </div>
-      <div class="form-group">
-        <label for="reg-admin">Admin Secret <span style="color:var(--text-dim)">(optional)</span></label>
-        <input type="password" id="reg-admin" placeholder="Leave blank for regular account">
-      </div>
-      <div id="reg-error" class="form-error"></div>
-      <button type="submit" class="btn btn-primary w-full" style="margin-top:0.5rem">Create Account</button>
-    </form>
+    <div id="admin-toggle" style="margin-top:1.5rem;text-align:center">
+      <button class="btn btn-sm" id="show-admin-btn" style="background:transparent;color:var(--text-3);font-size:0.75rem">Admin login</button>
+    </div>
 
-    <p class="auth-switch">
-      <span id="switch-text">Don't have an account?</span>
-      <a href="#" id="switch-link">Register</a>
-    </p>
+    <form id="admin-form" class="hidden" style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem">
+      <div class="form-group">
+        <label for="admin-email">Email</label>
+        <input type="email" id="admin-email" placeholder="admin@example.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="admin-password">Password</label>
+        <input type="password" id="admin-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div id="admin-error" class="form-error"></div>
+      <button type="submit" class="btn btn-primary w-full" style="margin-top:0.5rem">Admin Sign In</button>
+    </form>
   </div>
 </div>
 
 <script type="module">
-import { login, register, isLoggedIn } from '/assets/js/auth.js';
-import { toast } from '/assets/js/utils.js';
+import { quickLogin, login, isLoggedIn } from '/assets/js/auth.js';
+import { toggleTheme } from '/assets/js/theme.js';
 
 if (isLoggedIn()) window.location.href = '/';
 
-const loginForm = document.getElementById('login-form');
-const registerForm = document.getElementById('register-form');
-const tabLogin = document.getElementById('tab-login');
-const tabReg = document.getElementById('tab-register');
-const switchLink = document.getElementById('switch-link');
-const switchText = document.getElementById('switch-text');
+const toggleBtn = document.getElementById('theme-toggle-btn');
+const isDark = () => (document.documentElement.dataset.theme || 'dark') === 'dark';
+toggleBtn.textContent = isDark() ? '☀️' : '🌙';
+toggleBtn.addEventListener('click', () => { toggleTheme(); toggleBtn.textContent = isDark() ? '☀️' : '🌙'; });
 
-let mode = 'login';
-
-function setMode(m) {
-  mode = m;
-  if (m === 'login') {
-    loginForm.classList.remove('hidden');
-    registerForm.classList.add('hidden');
-    tabLogin.style.background = 'var(--bg-card)';
-    tabLogin.style.color = 'var(--text)';
-    tabReg.style.background = 'transparent';
-    tabReg.style.color = 'var(--text-muted)';
-    switchText.textContent = "Don't have an account?";
-    switchLink.textContent = 'Register';
-  } else {
-    loginForm.classList.add('hidden');
-    registerForm.classList.remove('hidden');
-    tabLogin.style.background = 'transparent';
-    tabLogin.style.color = 'var(--text-muted)';
-    tabReg.style.background = 'var(--bg-card)';
-    tabReg.style.color = 'var(--text)';
-    switchText.textContent = 'Already have an account?';
-    switchLink.textContent = 'Sign In';
-  }
-}
-
-tabLogin.addEventListener('click', () => setMode('login'));
-tabReg.addEventListener('click', () => setMode('register'));
-switchLink.addEventListener('click', e => { e.preventDefault(); setMode(mode === 'login' ? 'register' : 'login'); });
-
-loginForm.addEventListener('submit', async e => {
+// Quick join form
+document.getElementById('join-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const btn = loginForm.querySelector('button[type=submit]');
-  const err = document.getElementById('login-error');
+  const btn = e.target.querySelector('button[type=submit]');
+  const err = document.getElementById('join-error');
   err.textContent = '';
-  btn.disabled = true; btn.textContent = 'Signing in…';
+  btn.disabled = true; btn.textContent = 'Joining…';
   try {
-    await login(document.getElementById('login-email').value, document.getElementById('login-password').value);
-    window.location.href = '/';
+    await quickLogin(document.getElementById('username-input').value.trim());
+    window.location.href = sessionStorage.getItem('returnTo') || '/';
   } catch (ex) {
-    err.textContent = ex.message || 'Login failed';
+    err.textContent = ex.message;
   } finally {
-    btn.disabled = false; btn.textContent = 'Sign In';
+    btn.disabled = false; btn.textContent = 'Continue →';
   }
 });
 
-registerForm.addEventListener('submit', async e => {
+// Admin login toggle
+document.getElementById('show-admin-btn').addEventListener('click', () => {
+  document.getElementById('admin-form').classList.toggle('hidden');
+  document.getElementById('join-form').classList.toggle('hidden');
+  document.getElementById('admin-toggle').querySelector('button').textContent =
+    document.getElementById('admin-form').classList.contains('hidden') ? 'Admin login' : '← Back';
+});
+
+document.getElementById('admin-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const btn = registerForm.querySelector('button[type=submit]');
-  const err = document.getElementById('reg-error');
+  const btn = e.target.querySelector('button[type=submit]');
+  const err = document.getElementById('admin-error');
   err.textContent = '';
-  btn.disabled = true; btn.textContent = 'Creating account…';
+  btn.disabled = true; btn.textContent = 'Signing in…';
   try {
-    await register(
-      document.getElementById('reg-username').value,
-      document.getElementById('reg-email').value,
-      document.getElementById('reg-password').value,
-      document.getElementById('reg-admin').value,
-    );
-    window.location.href = '/';
+    await login(document.getElementById('admin-email').value, document.getElementById('admin-password').value);
+    window.location.href = '/admin';
   } catch (ex) {
-    err.textContent = ex.message || 'Registration failed';
+    err.textContent = ex.message;
   } finally {
-    btn.disabled = false; btn.textContent = 'Create Account';
+    btn.disabled = false; btn.textContent = 'Admin Sign In';
   }
 });
 </script>

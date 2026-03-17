@@ -14,6 +14,7 @@ export async function handlePosts(path: string, method: string, request: Request
     const category = url.searchParams.get('category');
     const tag = url.searchParams.get('tag');
     const search = url.searchParams.get('search');
+    const sort = url.searchParams.get('sort');
 
     let query = `
       SELECT p.*, c.name as category_name, c.slug as category_slug
@@ -33,7 +34,8 @@ export async function handlePosts(path: string, method: string, request: Request
     const countQuery = query.replace('SELECT p.*, c.name as category_name, c.slug as category_slug', 'SELECT COUNT(*) as total');
     const totalRow = await env.DB.prepare(countQuery).bind(...params).first<{ total: number }>();
 
-    query += ` ORDER BY p.published_at DESC LIMIT ? OFFSET ?`;
+    const orderBy = sort === 'views' ? 'p.view_count DESC, p.like_count DESC' : 'p.published_at DESC';
+    query += ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const rows = await env.DB.prepare(query).bind(...params).all();
@@ -88,17 +90,32 @@ export async function handlePosts(path: string, method: string, request: Request
     return json({ ...post, tags, liked_by_user }, 200, origin);
   }
 
-  // POST /posts (admin)
+  // POST /posts — any logged-in user can post
   if (method === 'POST' && path === '/posts') {
-    const admin = await requireAdmin(request, env);
-    if (!admin) return error('Forbidden', 403, origin);
+    const user = await requireAuth(request, env);
+    if (!user) return error('Forbidden', 403, origin);
     const body = await request.json<any>();
-    // Manual post creation (simplified)
+    if (!body.content?.trim()) return error('content is required', 400, origin);
+
+    // Auto-derive title from first sentence / first 70 chars if not provided
+    const rawText = body.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const autoTitle = (body.title || rawText).substring(0, 70);
+    const excerpt = rawText.substring(0, 200);
+
+    // Require a valid category
+    const cat = await env.DB.prepare('SELECT id FROM categories WHERE id = ? OR slug = ?')
+      .bind(body.category_id || 0, body.category_slug || '').first<{ id: number }>();
+    const categoryId = cat?.id || 1;
+
+    // Build slug from title
+    const baseSlug = autoTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const unique = `${baseSlug}-${Date.now()}`;
+
     const result = await env.DB.prepare(`
       INSERT INTO posts (title, slug, excerpt, content, category_id, author_id, ai_generated, meta_title, meta_desc, status, published_at)
       VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 'published', datetime('now'))
-    `).bind(body.title, body.slug, body.excerpt, body.content, body.category_id, admin.sub,
-       body.meta_title || body.title, body.meta_desc || body.excerpt).run();
+    `).bind(autoTitle, unique, excerpt, body.content, categoryId, user.sub,
+       autoTitle, excerpt).run();
     return json({ id: result.meta.last_row_id }, 201, origin);
   }
 

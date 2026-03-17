@@ -72,9 +72,33 @@ export async function handleAuth(path: string, method: string, request: Request,
   if (method === 'GET' && path === '/auth/me') {
     const user = await requireAuth(request, env);
     if (!user) return error('Unauthorized', 401, origin);
-    const row = await env.DB.prepare('SELECT id, username, email, role, created_at FROM users WHERE id = ?')
+    const row = await env.DB.prepare('SELECT id, username, role, created_at FROM users WHERE id = ?')
       .bind(user.sub).first();
     return json(row, 200, origin);
+  }
+
+  // POST /auth/quick — username-only login, token generated client-side
+  if (method === 'POST' && path === '/auth/quick') {
+    const body = await request.json<{ username: string; token: string }>();
+    if (!body.username?.trim() || !body.token) return error('username and token required', 400, origin);
+    const username = body.username.trim().substring(0, 30).replace(/[^a-zA-Z0-9_\- ]/g, '');
+    if (username.length < 2) return error('Username must be at least 2 characters', 400, origin);
+
+    // Returning user — token matches
+    const byToken = await env.DB.prepare('SELECT id, username, role FROM users WHERE token = ?')
+      .bind(body.token).first<{ id: number; username: string; role: string }>();
+    if (byToken) return json({ token: body.token, username: byToken.username, id: byToken.id, role: byToken.role }, 200, origin);
+
+    // Username taken by a different token
+    const byName = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+    if (byName) return error('Username already taken', 409, origin);
+
+    // New user
+    const result = await env.DB.prepare(
+      'INSERT INTO users (username, email, password_hash, role, token) VALUES (?, ?, ?, ?, ?)'
+    ).bind(username, `${body.token}@local`, '', 'user', body.token).run();
+
+    return json({ token: body.token, username, id: result.meta.last_row_id, role: 'user' }, 201, origin);
   }
 
   return null;

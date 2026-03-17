@@ -2,6 +2,7 @@ export interface Env {
   DB: D1Database;
   AI: Ai;
   KV_STORE: KVNamespace;
+  IMAGES: R2Bucket;
   JWT_SECRET: string;
   ADMIN_SECRET: string;
   SITE_URL: string;
