@@ -27,6 +27,10 @@ id      = "ecea8cf5e8e04313b738497c18f6927f"
 pattern = "api.sageblog.cfd"
 custom_domain = true
 
+[[routes]]
+pattern = "sageblog.cfd/*"
+zone_name = "sageblog.cfd"
+
 # Secrets (set via wrangler secret put):
 #   JWT_SECRET
 #   ADMIN_SECRET

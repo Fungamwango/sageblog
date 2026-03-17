@@ -11,10 +11,23 @@ import type { Env } from './types';
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Proxy frontend requests (sageblog.cfd) to Pages
+    if (url.hostname === 'sageblog.cfd' || url.hostname === 'www.sageblog.cfd') {
+      const pagesUrl = new URL(request.url);
+      pagesUrl.hostname = 'sageblog-frontend.pages.dev';
+      const pagesReq = new Request(pagesUrl.toString(), {
+        method: request.method,
+        headers: request.headers,
+        body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
+      });
+      return fetch(pagesReq);
+    }
+
     const preflight = handleOptions(request);
     if (preflight) return preflight;
 
-    const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
     const origin = request.headers.get('Origin');
