@@ -23,6 +23,10 @@ binding = "AI"
 binding = "KV_STORE"
 id      = "ecea8cf5e8e04313b738497c18f6927f"
 
+[[routes]]
+pattern = "api.sageblog.cfd"
+custom_domain = true
+
 # Secrets (set via wrangler secret put):
 #   JWT_SECRET
 #   ADMIN_SECRET
