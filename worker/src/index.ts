@@ -17,12 +17,20 @@ export default {
     if (url.hostname === 'sageblog.cfd' || url.hostname === 'www.sageblog.cfd') {
       const pagesUrl = new URL(request.url);
       pagesUrl.hostname = 'sageblog-frontend.pages.dev';
-      const pagesReq = new Request(pagesUrl.toString(), {
+
+      // Build clean headers without the original Host (Pages rejects wrong Host)
+      const headers = new Headers();
+      for (const [k, v] of request.headers.entries()) {
+        if (k.toLowerCase() !== 'host') headers.set(k, v);
+      }
+      headers.set('host', 'sageblog-frontend.pages.dev');
+
+      return fetch(new Request(pagesUrl.toString(), {
         method: request.method,
-        headers: request.headers,
+        headers,
         body: request.method !== 'GET' && request.method !== 'HEAD' ? request.body : undefined,
-      });
-      return fetch(pagesReq);
+        redirect: 'follow',
+      }));
     }
 
     const preflight = handleOptions(request);
