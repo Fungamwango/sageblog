@@ -14,14 +14,14 @@ crons = ["0 */6 * * *"]
 [[d1_databases]]
 binding       = "DB"
 database_name = "sageblog-db"
-database_id   = "REPLACE_WITH_YOUR_D1_ID"
+database_id   = "d14f71cb-83e6-41cd-8038-0a6afea736ad"
 
 [ai]
 binding = "AI"
 
 [[kv_namespaces]]
 binding = "KV_STORE"
-id      = "REPLACE_WITH_YOUR_KV_ID"
+id      = "ecea8cf5e8e04313b738497c18f6927f"
 
 # Secrets (set via wrangler secret put):
 #   JWT_SECRET
