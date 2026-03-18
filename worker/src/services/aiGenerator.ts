@@ -1,5 +1,6 @@
 import type { Env, GeneratedPost } from '../types';
 import { uniqueSlug, slugify } from './slugify';
+import { translateText, translateHtml } from './translate';
 
 /**
  * Convert markdown-flavoured text to clean HTML.
@@ -175,7 +176,7 @@ const TOPICS: Record<string, string[]> = {
   ],
 };
 
-export async function generatePost(env: Env, categorySlug: string, categoryId: number): Promise<number | null> {
+export async function generatePost(env: Env, categorySlug: string, categoryId: number, language?: { code: string; name: string }): Promise<number | null> {
   const topics = TOPICS[categorySlug] || TOPICS['technology'];
   const recentTitles = await getRecentTitles(env.DB, categoryId);
 
@@ -330,6 +331,18 @@ Read_time: estimated minutes (number only)`;
   // Convert markdown to HTML if the model returned markdown instead of HTML
   parsed.content = mdToHtml(parsed.content);
 
+  // Translate to target language via Google Translate if specified
+  if (language) {
+    const [tTitle, tExcerpt, tContent] = await Promise.all([
+      translateText(parsed.title, language.code),
+      translateText(parsed.excerpt, language.code),
+      translateHtml(parsed.content, language.code),
+    ]);
+    parsed.title   = tTitle   || parsed.title;
+    parsed.excerpt = tExcerpt || parsed.excerpt;
+    parsed.content = tContent || parsed.content;
+  }
+
   // Insert post
   const postResult = await env.DB.prepare(`
     INSERT INTO posts (title, slug, excerpt, content, category_id, ai_generated, meta_title, meta_desc, read_time, status, published_at)
@@ -360,6 +373,21 @@ Read_time: estimated minutes (number only)`;
   }
 
   await logGeneration(env.DB, postId, categoryId, userPrompt, MODEL, null, 'success', null);
+
+  // Ping IndexNow so Bing/Yandex index the new post within minutes
+  try {
+    await fetch('https://api.indexnow.org/indexnow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({
+        host: 'sageblog.cfd',
+        key: '5f32fb2a2c63610c293115513c3ce207',
+        keyLocation: 'https://sageblog.cfd/5f32fb2a2c63610c293115513c3ce207.txt',
+        urlList: [`https://sageblog.cfd/post/${slug}`],
+      }),
+    });
+  } catch (_) { /* non-critical */ }
+
   return postId;
 }
 

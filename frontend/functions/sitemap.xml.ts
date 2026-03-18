@@ -8,23 +8,25 @@ export async function onRequestGet(ctx: any) {
     db.prepare(`SELECT t.slug FROM tags t JOIN post_tags pt ON t.id = pt.tag_id GROUP BY t.id HAVING COUNT(pt.post_id) > 1`).all(),
   ]);
 
-  let urls = `\n  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
+  const today = new Date().toISOString().substring(0, 10);
+  let urls = `\n  <url><loc>${base}/</loc><lastmod>${today}</lastmod><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
 
   for (const cat of (categories.results as any[])) {
-    urls += `\n  <url><loc>${base}/category/${cat.slug}</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
+    urls += `\n  <url><loc>${base}/category/${cat.slug}</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>`;
   }
   for (const tag of (tags.results as any[])) {
-    urls += `\n  <url><loc>${base}/tag/${tag.slug}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>`;
+    urls += `\n  <url><loc>${base}/tag/${tag.slug}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>`;
   }
   for (const post of (posts.results as any[])) {
     const lastmod = post.updated_at ? post.updated_at.substring(0, 10) : new Date().toISOString().substring(0, 10);
     const safeTitle = post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;');
     const imgFromContent = post.content?.match(/<img[^>]+src="([^"]+)"/i)?.[1];
-    const imgUrl = post.featured_image
+    const rawImg = post.featured_image
       ? `${base}${post.featured_image}`
       : imgFromContent
         ? (imgFromContent.startsWith('/images/') ? `https://api.sageblog.cfd${imgFromContent}` : imgFromContent)
         : null;
+    const imgUrl = rawImg && !rawImg.includes('example.com') && !rawImg.includes('placeholder') ? rawImg : null;
     const imgTag = imgUrl
       ? `\n    <image:image><image:loc>${imgUrl}</image:loc><image:title>${safeTitle}</image:title></image:image>`
       : '';
