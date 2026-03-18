@@ -15,24 +15,37 @@
     .chat-header p { color: var(--text-2); font-size: 0.95rem; }
     .chat-input-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); padding: 1.25rem; margin-bottom: 1.5rem; }
     .chat-input-row { display: flex; gap: 0.75rem; align-items: flex-end; }
-    .chat-input-row textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.75rem; color: var(--text); font-family: var(--font); font-size: 0.95rem; outline: none; resize: vertical; min-height: 60px; }
+    .chat-input-row textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.75rem; color: var(--text); font-family: var(--font); font-size: 0.95rem; outline: none; resize: vertical; min-height: 60px; width: 100%; box-sizing: border-box; }
     .chat-input-row textarea:focus { border-color: var(--primary); }
+    .chat-send-btn { white-space: nowrap; padding: 0.6rem 1.25rem; align-self: flex-end; flex-shrink: 0; }
     .lang-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
     .lang-row label { font-size: 0.85rem; color: var(--text-2); }
     .chat-response { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); padding: 1.5rem; margin-bottom: 1.5rem; display: none; }
     .chat-response .q-label { font-size: 0.78rem; color: var(--text-2); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .chat-response .q-text { font-weight: 600; font-size: 1.05rem; margin-bottom: 1.25rem; color: var(--heading); border-left: 3px solid var(--primary); padding-left: 0.75rem; }
+    .chat-response .q-text { font-weight: 600; font-size: 1.05rem; margin-bottom: 1.25rem; color: var(--heading); border-left: 3px solid var(--primary); padding-left: 0.75rem; word-break: break-word; }
     .chat-response .a-label { font-size: 0.78rem; color: var(--text-2); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .chat-response .a-body { line-height: 1.75; color: var(--text); }
+    .chat-response .a-body { line-height: 1.75; color: var(--text); word-break: break-word; overflow-wrap: break-word; }
     .chat-response .a-body p { margin: 0.6rem 0; }
-    .chat-response .a-body h3 { color: var(--heading); margin: 1rem 0 0.4rem; }
+    .chat-response .a-body h3 { color: var(--heading); margin: 1rem 0 0.4rem; font-size: 1rem; }
+    .chat-response .a-body ul { padding-left: 1.25rem; }
     .chat-response .view-post { margin-top: 1rem; font-size: 0.85rem; }
-    .chat-history { }
     .history-item { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 1rem; margin-bottom: 0.75rem; cursor: pointer; transition: border-color 0.15s; }
     .history-item:hover { border-color: var(--primary); }
     .history-item .hi-q { font-weight: 500; font-size: 0.9rem; color: var(--heading); margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .history-item .hi-meta { font-size: 0.78rem; color: var(--text-2); }
     .typing-indicator { padding: 0.5rem 0; }
+    @media (max-width: 480px) {
+      .chat-wrap { margin: 1rem auto; }
+      .chat-header h1 { font-size: 1.5rem; }
+      .chat-header p { font-size: 0.875rem; }
+      .chat-input-box { padding: 0.875rem; }
+      .chat-input-row { flex-direction: column; align-items: stretch; }
+      .chat-send-btn { width: 100%; text-align: center; padding: 0.65rem; }
+      .chat-response { padding: 1rem; }
+      .chat-response .q-text { font-size: 0.95rem; }
+      #lang-picker { width: 100%; }
+      #lang-btn { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -58,7 +71,7 @@
     <div class="chat-input-box">
       <div class="chat-input-row">
         <textarea id="chat-input" placeholder="Ask a question… e.g. Why do humans dream?" rows="3"></textarea>
-        <button class="btn btn-primary" id="chat-send" style="white-space:nowrap;padding:0.6rem 1.25rem">Ask →</button>
+        <button class="btn btn-primary chat-send-btn" id="chat-send">Ask →</button>
       </div>
       <div class="lang-row">
         <label>🌐 Respond in:</label>
@@ -67,10 +80,10 @@
           <button type="button" id="lang-btn" class="btn btn-outline btn-sm" style="min-width:140px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
             <span id="lang-btn-label">English</span><span>▾</span>
           </button>
-          <div id="lang-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 8px 24px rgba(0,0,0,0.3);min-width:220px;max-height:280px;overflow:hidden">
+          <div id="lang-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:var(--bg-2,#111119);border:1px solid var(--border-2,rgba(255,255,255,0.12));border-radius:var(--r-sm);box-shadow:0 12px 32px rgba(0,0,0,0.6);min-width:220px;max-height:280px;overflow:hidden">
             <div style="padding:0.5rem">
               <input type="text" id="lang-search" placeholder="Search language or enter code…" autocomplete="off"
-                style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.4rem 0.6rem;color:var(--text);font-size:0.85rem;outline:none;box-sizing:border-box">
+                style="width:100%;background:var(--bg-3,#181824);border:1px solid var(--border-2,rgba(255,255,255,0.12));border-radius:var(--r-sm);padding:0.4rem 0.6rem;color:var(--text,#e8e8f4);font-size:0.85rem;outline:none;box-sizing:border-box">
             </div>
             <ul id="lang-list" style="list-style:none;padding:0;margin:0;overflow-y:auto;max-height:210px"></ul>
           </div>
@@ -84,7 +97,10 @@
     <div class="chat-response" id="chat-response">
       <div class="q-label">Your question</div>
       <div class="q-text" id="resp-question"></div>
-      <div class="a-label">SageBot's answer</div>
+      <div class="a-label" style="display:flex;align-items:center;justify-content:space-between">
+        <span>SageBot's answer</span>
+        <button id="tts-btn" title="Listen" style="display:none;background:none;border:none;cursor:pointer;color:var(--text-2);font-size:1rem;padding:0.2rem 0.4rem;border-radius:var(--r-sm);transition:color .2s" onmouseover="this.style.color='var(--purple-3)'" onmouseout="this.style.color='var(--text-2)'">🔊</button>
+      </div>
       <div class="a-body" id="resp-answer"></div>
       <div class="view-post" id="resp-post-link"></div>
     </div>
@@ -97,7 +113,7 @@
 <footer class="site-footer">
   <div class="container">
     <div class="footer-bottom">
-      <span>© 2025 SageBlog.cfd</span>
+      <span>© <span class="copy-year"></span> SageBlog.cfd</span>
       <span>Powered by Cloudflare Workers AI</span>
     </div>
   </div>
@@ -219,23 +235,50 @@ input.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendBtn.click();
 });
 
+// ── Text-to-Speech ────────────────────────────────────────────────
+function speakText(text, lang, btn) {
+  if (!('speechSynthesis' in window)) return;
+  if (window.speechSynthesis.speaking) {
+    window.speechSynthesis.cancel();
+    btn.textContent = '🔊'; btn.title = 'Listen';
+    return;
+  }
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = lang || 'en';
+  utt.rate = 0.95;
+  btn.textContent = '⏹'; btn.title = 'Stop';
+  utt.onend = () => { btn.textContent = '🔊'; btn.title = 'Listen'; };
+  utt.onerror = () => { btn.textContent = '🔊'; btn.title = 'Listen'; };
+  window.speechSynthesis.speak(utt);
+}
+
 sendBtn.addEventListener('click', async () => {
   const question = input.value.trim();
-  if (!question) return;
-  if (question.length < 3) { statusEl.textContent = 'Ask something longer…'; return; }
+  if (!question || question.length < 3) {
+    input.style.borderColor = 'var(--red,#ef4444)';
+    input.placeholder = 'Please type a question first…';
+    setTimeout(() => { input.style.borderColor = ''; input.placeholder = 'Ask a question… e.g. Why do humans dream?'; }, 2000);
+    return;
+  }
 
   sendBtn.disabled = true;
   statusEl.textContent = '';
+  if (window.speechSynthesis?.speaking) window.speechSynthesis.cancel();
+  const ttsBtnEl = document.getElementById('tts-btn');
+  if (ttsBtnEl) { ttsBtnEl.style.display = 'none'; ttsBtnEl.textContent = '🔊'; }
   respBox.style.display = 'block';
   respQ.textContent = question;
-  respA.innerHTML = `<div id="chat-spinner" style="padding:1rem 0;display:flex;align-items:center;gap:0.75rem">
-    <div style="display:flex;gap:5px;align-items:center">
-      <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0s"></span>
-      <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.15s"></span>
-      <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.3s"></span>
+  respA.innerHTML = `<div id="chat-spinner" style="display:flex;align-items:flex-start;gap:0.75rem;padding:0.25rem 0">
+    <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.9rem">🤖</div>
+    <div style="background:var(--bg-3,#181824);border:1px solid rgba(99,102,241,0.25);border-radius:0 12px 12px 12px;padding:0.75rem 1rem;display:flex;align-items:center;gap:0.75rem;min-width:160px">
+      <div style="display:flex;gap:5px;align-items:center">
+        <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0s"></span>
+        <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.15s"></span>
+        <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.3s"></span>
+      </div>
+      <span id="spinner-msg" style="font-size:0.82rem;color:var(--text-2,#9898b8)">Thinking…</span>
+      <span id="spinner-counter" style="font-size:0.75rem;color:var(--text-3,#55556a);margin-left:auto">0s</span>
     </div>
-    <span id="spinner-msg" style="font-size:0.875rem;color:var(--text-2)">Thinking…</span>
-    <span id="spinner-counter" style="font-size:0.78rem;color:var(--text-3);margin-left:auto">0s</span>
   </div>`;
   // Rotating messages + counter
   const spinMsgs = ['Thinking…','Processing your question…','Consulting knowledge base…','Generating response…','Almost there…','Translating…'];
@@ -264,7 +307,7 @@ sendBtn.addEventListener('click', async () => {
         question,
         language: langInput.value,
         // Send last 6 turns as context (plain text answers, no HTML)
-        history: history.slice(0, 6).map(h => ({ question: h.question, answer: h.answer })),
+        history: history.slice(0, 6).map(h => ({ question: h.question, answer: h.answer, answer_en: h.answer_en })),
       }),
     });
     if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
@@ -273,12 +316,18 @@ sendBtn.addEventListener('click', async () => {
     respQ.textContent = data.question;
     clearInterval(spinTimer);
     respA.innerHTML = mdToHtml(data.answer);
+    // Show TTS button
+    const ttsBtn = document.getElementById('tts-btn');
+    if ('speechSynthesis' in window && ttsBtn) {
+      ttsBtn.style.display = 'inline-block';
+      ttsBtn.onclick = () => speakText(respA.innerText, langInput.value, ttsBtn);
+    }
     if (data.post_slug) {
       respPost.innerHTML = `<a href="/post/${escHtml(data.post_slug)}" class="btn btn-outline btn-sm">📖 View as blog post →</a>`;
     }
 
-    // Save to local history
-    const entry = { question: data.question, answer: data.answer, post_slug: data.post_slug, lang: langInput.value, ts: Date.now() };
+    // Save to local history (store answer_en for clean AI context on next turn)
+    const entry = { question: data.question, answer: data.answer, answer_en: data.answer_en || data.answer, post_slug: data.post_slug, lang: langInput.value, ts: Date.now() };
     history.unshift(entry);
     if (history.length > 20) history.pop();
     localStorage.setItem('chat_history', JSON.stringify(history));

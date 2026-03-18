@@ -39,7 +39,11 @@ export async function handlePosts(path: string, method: string, request: Request
     const countQuery = query.replace('SELECT p.*, c.name as category_name, c.slug as category_slug', 'SELECT COUNT(*) as total');
     const totalRow = await env.DB.prepare(countQuery).bind(...params).first<{ total: number }>();
 
-    const orderBy = sort === 'views' ? 'p.view_count DESC, p.like_count DESC' : 'p.published_at DESC';
+    const orderBy = sort === 'views'
+      ? 'p.view_count DESC, p.like_count DESC'
+      : sort === 'random'
+        ? "(RANDOM() * (1.0 / (1.0 + (julianday('now') - julianday(p.published_at))))) DESC"
+        : 'p.published_at DESC';
     query += ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SageBlog — AI-Powered Knowledge Blog</title>
+  <title>SageBlog — AI-Powered Knowledge Blog - answers in local languages</title>
   <meta name="description" content="SageBlog delivers AI-generated articles on technology, science, business, health, culture, and environment. Fresh insights every day.">
   <link rel="canonical" href="https://sageblog.cfd/">
   <meta property="og:title" content="SageBlog — AI-Powered Knowledge Blog">
@@ -22,7 +22,7 @@
 <header class="site-header">
   <div class="container header-inner">
     <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
-    <nav class="header-nav">
+    <nav class="header-nav" id="main-nav">
       <a href="/" class="active">Home</a>
       <a href="/category/technology">Tech</a>
       <a href="/category/science">Science</a>
@@ -35,16 +35,17 @@
       <input type="text" id="search-input" placeholder="Search posts…" autocomplete="off">
     </div>
     <div class="header-actions" id="header-auth">
-      <a href="/login" class="btn btn-sm btn-primary">Sign In</a>
+      <a href="/login" class="btn btn-sm btn-primary">Join</a>
     </div>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Menu" onclick="document.getElementById('main-nav').classList.toggle('nav-open');this.classList.toggle('open')">
+      <span></span><span></span><span></span>
+    </button>
   </div>
 </header>
 
-<section class="hero">
-  <div class="container">
-    <h1>Knowledge, <em>Synthesized by AI</em></h1>
-    <p>Fresh, detailed articles on technology, science, business, health, culture, and environment — generated and published daily.</p>
-    <div id="hero-stats" style="display:flex;justify-content:center;gap:2rem;margin:1rem 0;flex-wrap:wrap">
+<section class="hero" style="margin-top:10px; padding-top:5px;">
+  <div class="container" style="margin-top: 2px; padding-top:5px;">
+        <div id="hero-stats" style="display:flex;justify-content:center;gap:2rem;margin:10px 0;flex-wrap:wrap">
       <span style="font-size:0.875rem;color:var(--text-2)">🤖 AI Posts: <strong id="stat-ai" style="color:var(--primary-light)">…</strong></span>
       <span style="font-size:0.875rem;color:var(--text-2)">✍️ User Posts: <strong id="stat-user" style="color:var(--primary-light)">…</strong></span>
       <span style="font-size:0.875rem;color:var(--text-2)">📚 Total: <strong id="stat-total" style="color:var(--primary-light)">…</strong></span>
@@ -58,28 +59,31 @@
     <div style="max-width:700px;margin:0 auto">
       <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem">
         <span style="font-size:1.1rem">🤖</span>
-        <span style="font-weight:600;font-size:0.95rem;color:var(--heading)">Ask SageBot</span>
+        <span style="font-weight:600;font-size:0.95rem;color:var(--heading)">Ask SageAI</span>
         <span style="font-size:0.78rem;color:var(--text-2);margin-left:auto"><a href="/chat" style="color:var(--primary-light)">Open full chat →</a></span>
       </div>
-      <div style="display:flex;gap:0.5rem;align-items:flex-end;flex-wrap:wrap">
-        <input type="text" id="hero-chat-input" placeholder="Ask anything… e.g. Why do we dream?" autocomplete="off"
-          style="flex:1;min-width:180px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.55rem 0.85rem;color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;transition:border-color 0.15s"
-          onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'">
-        <!-- Compact language picker -->
-        <div id="hero-lang-picker" style="position:relative">
-          <button type="button" id="hero-lang-btn" class="btn btn-outline btn-sm" style="min-width:100px;display:flex;align-items:center;gap:0.4rem;justify-content:space-between">
-            <span id="hero-lang-label">🌐 EN</span><span style="font-size:0.7rem">▾</span>
-          </button>
-          <div id="hero-lang-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);right:0;z-index:200;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 8px 24px rgba(0,0,0,0.3);min-width:200px;max-height:260px;overflow:hidden">
-            <div style="padding:0.4rem">
-              <input type="text" id="hero-lang-search" placeholder="Search language…" autocomplete="off"
-                style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.35rem 0.6rem;color:var(--text);font-size:0.82rem;outline:none;box-sizing:border-box">
+      <div style="display:flex;flex-direction:column;gap:0.5rem">
+        <textarea id="hero-chat-input" placeholder="💬 Ask me anything… i will respond in your selected language. e.g. Why do we dream? " rows="3" autocomplete="off"
+          style="width:100%;background:var(--bg-2,#111119);border:2px solid rgba(99,102,241,0.35);border-radius:var(--r-sm);padding:0.75rem 1rem;color:var(--text);font-family:var(--font);font-size:0.95rem;outline:none;transition:border-color 0.2s,box-shadow 0.2s;box-sizing:border-box;resize:none;line-height:1.5"
+          onfocus="this.style.borderColor='#6366f1';this.style.boxShadow='0 0 0 3px rgba(99,102,241,0.15)'" onblur="this.style.borderColor='rgba(99,102,241,0.35)';this.style.boxShadow='none'"></textarea>
+        <div style="display:flex;gap:0.5rem;align-items:center">
+          <span style="font-size:0.8rem;color:var(--text-2);white-space:nowrap">AI responds in:</span>
+          <!-- Compact language picker -->
+          <div id="hero-lang-picker" style="position:relative">
+            <button type="button" id="hero-lang-btn" class="btn btn-outline btn-sm" style="min-width:90px;display:flex;align-items:center;gap:0.4rem;justify-content:space-between">
+              <span id="hero-lang-label">🌐 EN</span><span style="font-size:0.7rem">▾</span>
+            </button>
+            <div id="hero-lang-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:var(--bg-2,#111119);border:1px solid var(--border-2,rgba(255,255,255,0.12));border-radius:var(--r-sm);box-shadow:0 12px 32px rgba(0,0,0,0.6);min-width:200px;max-height:260px;overflow:hidden">
+              <div style="padding:0.4rem">
+                <input type="text" id="hero-lang-search" placeholder="Search language…" autocomplete="off"
+                  style="width:100%;background:var(--bg-3,#181824);border:1px solid var(--border-2,rgba(255,255,255,0.12));border-radius:var(--r-sm);padding:0.35rem 0.6rem;color:var(--text,#e8e8f4);font-size:0.82rem;outline:none;box-sizing:border-box">
+              </div>
+              <ul id="hero-lang-list" style="list-style:none;padding:0;margin:0;overflow-y:auto;max-height:190px"></ul>
             </div>
-            <ul id="hero-lang-list" style="list-style:none;padding:0;margin:0;overflow-y:auto;max-height:190px"></ul>
           </div>
+          <input type="hidden" id="hero-lang-value" value="en">
+          <button class="btn btn-primary btn-sm" id="hero-chat-btn" style="flex:1;white-space:nowrap;justify-content:center">Ask SageAI →</button>
         </div>
-        <input type="hidden" id="hero-lang-value" value="en">
-        <button class="btn btn-primary btn-sm" id="hero-chat-btn" style="white-space:nowrap">Ask →</button>
       </div>
       <div id="hero-chat-response" style="display:none;margin-top:0.85rem;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);padding:1rem;font-size:0.875rem;line-height:1.7;color:var(--text);max-height:260px;overflow-y:auto"></div>
     </div>
@@ -116,21 +120,7 @@
       </div>
     </div>
 
-    <!-- Featured Posts -->
-    <section class="section" id="featured-section">
-      <div class="section-header">
-        <h2 class="section-title">✨ Featured</h2>
-      </div>
-      <div class="featured-grid" id="featured-posts">
-        <div class="featured-main skeleton" style="height:280px"></div>
-        <div class="featured-side">
-          <div class="post-card skeleton" style="height:120px"></div>
-          <div class="post-card skeleton" style="height:120px"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Latest Posts with Sidebar -->
+    <!-- Posts with Sidebar -->
     <div class="content-layout">
       <section class="section">
         <div class="section-header">
@@ -207,13 +197,13 @@
       <div class="footer-col">
         <h5>Legal</h5>
         <ul>
-          <li><a href="#">Privacy Policy</a></li>
-          <li><a href="#">Terms of Use</a></li>
+          <li><a href="/privacy">Privacy Policy</a></li>
+          <li><a href="/terms">Terms of Use</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
-      <span>© 2025 SageBlog.cfd — AI content for informational purposes.</span>
+      <span>© <span class="copy-year"></span> SageBlog.cfd — AI content for informational purposes.</span>
       <span>Powered by Cloudflare Workers AI</span>
     </div>
   </div>
@@ -227,6 +217,14 @@ import { injectSiteLD } from '/assets/js/seo.js';
 
 injectSiteLD();
 updateHeaderAuth();
+
+// Close mobile nav when a link is clicked
+document.getElementById('main-nav').querySelectorAll('a').forEach(a => {
+  a.addEventListener('click', () => {
+    document.getElementById('main-nav').classList.remove('nav-open');
+    document.getElementById('hamburger-btn').classList.remove('open');
+  });
+});
 
 // Hero post counts
 (async () => {
@@ -390,6 +388,7 @@ async function doPost() {
       currentPage = 1; currentCategory = ''; currentSearch = '';
       setParam('page', ''); setParam('category', ''); setParam('search', '');
       document.getElementById('category-filter').value = '';
+      forceLatest = true;
       loadPosts();
       window.scrollTo({ top: document.getElementById('posts-grid').offsetTop - 80, behavior: 'smooth' });
     }, 800);
@@ -452,33 +451,6 @@ get('/tags').then(tags => {
     ).join('');
 }).catch(() => {});
 
-// Load featured
-get('/posts/featured').then(posts => {
-  if (!posts.length) { document.getElementById('featured-section').style.display = 'none'; return; }
-  const [main, ...side] = posts;
-  document.getElementById('featured-posts').innerHTML = `
-    <div class="featured-main" onclick="location.href='/post/${escHtml(main.slug)}'">
-      <div class="cat-pill">
-        <a href="/category/${escHtml(main.category_slug)}" onclick="event.stopPropagation()">${escHtml(main.category_name)}</a>
-      </div>
-      <h2>${escHtml(main.title)}</h2>
-      <p>${escHtml(main.excerpt ? (main.excerpt.length >= 200 ? main.excerpt.substring(0, 200) + '…' : main.excerpt) : '')}</p>
-      <div class="post-meta" style="margin-top:1rem">
-        <span class="post-meta-item">♥ ${main.like_count}</span>
-        <span class="post-meta-item">👁 ${main.view_count}</span>
-      </div>
-    </div>
-    <div class="featured-side">
-      ${side.map(p => `
-        <div class="post-card" onclick="location.href='/post/${escHtml(p.slug)}'">
-          <div class="cat-pill"><a href="/category/${escHtml(p.category_slug)}" onclick="event.stopPropagation()">${escHtml(p.category_name)}</a></div>
-          <h3>${escHtml(p.title)}</h3>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}).catch(() => { document.getElementById('featured-section').style.display = 'none'; });
-
 // Search
 const searchInput = document.getElementById('search-input');
 searchInput.value = currentSearch;
@@ -490,6 +462,8 @@ searchInput.addEventListener('input', debounce(e => {
   loadPosts();
 }, 400));
 
+let forceLatest = false;
+
 async function loadPosts() {
   postsGrid.innerHTML = renderSkeleton(6);
   pagination.innerHTML = '';
@@ -497,6 +471,11 @@ async function loadPosts() {
   const params = new URLSearchParams({ page: currentPage, limit: 9 });
   if (currentCategory) params.set('category', currentCategory);
   if (currentSearch) params.set('search', currentSearch);
+
+  // Default sort: random weighted by recency. Force latest after new post or when filtering.
+  const useRandom = !currentCategory && !currentSearch && currentPage === 1 && !forceLatest;
+  if (useRandom) params.set('sort', 'random');
+  forceLatest = false;
 
   if (currentCategory) {
     heading.textContent = currentCategory.charAt(0).toUpperCase() + currentCategory.slice(1);
@@ -604,19 +583,27 @@ window.goTo = (p) => {
 
   async function askSageBot() {
     const question = chatInput.value.trim();
-    if (!question || question.length < 2) return;
+    if (!question || question.length < 2) {
+      chatInput.style.borderColor = 'var(--red,#ef4444)';
+      chatInput.placeholder = 'Please type a question first…';
+      setTimeout(() => { chatInput.style.borderColor = ''; chatInput.placeholder = 'Ask anything… e.g. Why do we dream?'; }, 2000);
+      return;
+    }
 
     chatBtn.disabled = true;
     chatBtn.textContent = '…';
     chatResp.style.display = 'block';
-    chatResp.innerHTML = `<div id="hero-spinner" style="display:flex;align-items:center;gap:0.65rem;padding:0.25rem 0">
-      <div style="display:flex;gap:5px;align-items:center">
-        <span style="width:7px;height:7px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0s"></span>
-        <span style="width:7px;height:7px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.15s"></span>
-        <span style="width:7px;height:7px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.3s"></span>
+    chatResp.innerHTML = `<div id="hero-spinner" style="display:flex;align-items:flex-start;gap:0.65rem">
+      <div style="width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.8rem">🤖</div>
+      <div style="background:var(--bg-3,#181824);border:1px solid rgba(99,102,241,0.25);border-radius:0 10px 10px 10px;padding:0.6rem 0.875rem;display:flex;align-items:center;gap:0.65rem;min-width:140px">
+        <div style="display:flex;gap:4px;align-items:center">
+          <span style="width:7px;height:7px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0s"></span>
+          <span style="width:7px;height:7px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.15s"></span>
+          <span style="width:7px;height:7px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.3s"></span>
+        </div>
+        <span id="hero-spin-msg" style="font-size:0.8rem;color:var(--text-2,#9898b8)">Thinking…</span>
+        <span id="hero-spin-cnt" style="font-size:0.72rem;color:var(--text-3,#55556a);margin-left:auto">0s</span>
       </div>
-      <span id="hero-spin-msg" style="font-size:0.82rem;color:var(--text-2)">Thinking…</span>
-      <span id="hero-spin-cnt" style="font-size:0.75rem;color:var(--text-3);margin-left:auto">0s</span>
     </div>`;
     const heroSpinMsgs = ['Thinking…','Processing…','Consulting AI…','Generating…','Almost there…','Translating…'];
     let heroSpinSec = 0, heroSpinIdx = 0;
@@ -640,19 +627,33 @@ window.goTo = (p) => {
         body: JSON.stringify({
           question,
           language: heroLangVal.value || 'en',
-          history: heroChatHistory.slice(0, 4).map(h => ({ question: h.question, answer: h.answer })),
+          history: heroChatHistory.slice(0, 4).map(h => ({ question: h.question, answer: h.answer, answer_en: h.answer_en })),
         }),
       });
       if (!res.ok) throw new Error('Failed');
       const data = await res.json();
       clearInterval(heroSpinTimer);
       chatResp.innerHTML = `
-        <div style="font-weight:600;margin-bottom:0.5rem;color:var(--heading)">${escHtml(data.question)}</div>
-        <div style="line-height:1.7">${mdToHtml(data.answer)}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem">
+          <div style="font-weight:600;color:var(--heading)">${escHtml(data.question)}</div>
+          ${'speechSynthesis' in window ? `<button id="hero-tts-btn" title="Listen" style="background:none;border:none;cursor:pointer;color:var(--text-2);font-size:1rem;padding:0.2rem 0.35rem;border-radius:6px;flex-shrink:0">🔊</button>` : ''}
+        </div>
+        <div id="hero-answer-text" style="line-height:1.7">${mdToHtml(data.answer)}</div>
         ${data.post_slug ? `<div style="margin-top:0.75rem"><a href="/post/${escHtml(data.post_slug)}" class="btn btn-outline btn-sm" style="font-size:0.78rem">📖 View as blog post →</a></div>` : ''}
       `;
+      const heroTtsBtn = document.getElementById('hero-tts-btn');
+      if (heroTtsBtn) {
+        heroTtsBtn.onclick = () => {
+          if (window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); heroTtsBtn.textContent = '🔊'; return; }
+          const utt = new SpeechSynthesisUtterance(document.getElementById('hero-answer-text').innerText);
+          utt.lang = heroLangVal.value || 'en'; utt.rate = 0.95;
+          heroTtsBtn.textContent = '⏹';
+          utt.onend = utt.onerror = () => { heroTtsBtn.textContent = '🔊'; };
+          window.speechSynthesis.speak(utt);
+        };
+      }
       // Save to local history for context continuity
-      heroChatHistory.unshift({ question: data.question, answer: data.answer, post_slug: data.post_slug, lang: localStorage.getItem('chat_lang') || 'en', ts: Date.now() });
+      heroChatHistory.unshift({ question: data.question, answer: data.answer, answer_en: data.answer_en || data.answer, post_slug: data.post_slug, lang: localStorage.getItem('chat_lang') || 'en', ts: Date.now() });
       if (heroChatHistory.length > 20) heroChatHistory.pop();
       localStorage.setItem('chat_history', JSON.stringify(heroChatHistory));
       chatInput.value = '';
@@ -666,7 +667,7 @@ window.goTo = (p) => {
   }
 
   chatBtn.addEventListener('click', askSageBot);
-  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter') askSageBot(); });
+  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); askSageBot(); } });
 })();
 
 loadPosts();

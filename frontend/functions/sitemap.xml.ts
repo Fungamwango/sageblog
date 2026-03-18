@@ -8,16 +8,16 @@ export async function onRequestGet(ctx: any) {
     db.prepare(`SELECT t.slug FROM tags t JOIN post_tags pt ON t.id = pt.tag_id GROUP BY t.id HAVING COUNT(pt.post_id) > 1`).all(),
   ]);
 
-  let urls = `\n  <url><loc>${base}/</loc><changefreq>always</changefreq><priority>1.0</priority></url>`;
+  let urls = `\n  <url><loc>${base}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>`;
 
   for (const cat of (categories.results as any[])) {
-    urls += `\n  <url><loc>${base}/category/${cat.slug}</loc><changefreq>always</changefreq><priority>0.8</priority></url>`;
+    urls += `\n  <url><loc>${base}/category/${cat.slug}</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`;
   }
   for (const tag of (tags.results as any[])) {
-    urls += `\n  <url><loc>${base}/tag/${tag.slug}</loc><changefreq>always</changefreq><priority>0.6</priority></url>`;
+    urls += `\n  <url><loc>${base}/tag/${tag.slug}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>`;
   }
   for (const post of (posts.results as any[])) {
-    const lastmod = post.updated_at.substring(0, 10);
+    const lastmod = post.updated_at ? post.updated_at.substring(0, 10) : new Date().toISOString().substring(0, 10);
     const safeTitle = post.title.replace(/&/g, '&amp;').replace(/</g, '&lt;');
     const imgFromContent = post.content?.match(/<img[^>]+src="([^"]+)"/i)?.[1];
     const imgUrl = post.featured_image
@@ -32,7 +32,7 @@ export async function onRequestGet(ctx: any) {
     const vidTag = vidUrl
       ? `\n    <video:video><video:content_loc>${vidUrl.startsWith('/images/') ? 'https://api.sageblog.cfd' + vidUrl : vidUrl}</video:content_loc><video:title>${safeTitle}</video:title></video:video>`
       : '';
-    urls += `\n  <url><loc>${base}/post/${post.slug}</loc><lastmod>${lastmod}</lastmod><changefreq>always</changefreq><priority>0.7</priority>${imgTag}${vidTag}</url>`;
+    urls += `\n  <url><loc>${base}/post/${post.slug}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority>${imgTag}${vidTag}</url>`;
   }
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>

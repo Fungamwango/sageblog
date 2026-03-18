@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||'dark'</script>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — SageBlog</title>
+  <meta name="description" content="Privacy Policy for SageBlog.cfd">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
+  <link rel="stylesheet" href="/assets/css/main.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
+    <nav class="header-nav">
+      <a href="/">Home</a>
+      <a href="/chat">🤖 Ask AI</a>
+    </nav>
+    <div class="header-actions" id="header-auth"></div>
+  </div>
+</header>
+
+<main>
+  <div class="container-narrow" style="padding:3rem 1.5rem">
+    <h1 style="margin-bottom:0.5rem">Privacy Policy</h1>
+    <p style="color:var(--text-3);font-size:0.85rem;margin-bottom:2.5rem">Last updated: March 2026</p>
+
+    <div class="post-content">
+      <p>SageBlog ("we", "us", or "our") operates sageblog.cfd. This page explains what information we collect, how we use it, and your rights.</p>
+
+      <h2>1. Information We Collect</h2>
+      <p><strong>Account data:</strong> When you register, we collect your username and email address. Passwords are hashed and never stored in plain text.</p>
+      <p><strong>Guest activity:</strong> Guest users are identified by a random token stored in your browser's local storage. No personal information is required.</p>
+      <p><strong>Content:</strong> Posts, comments, and questions you submit are stored in our database and may be publicly visible.</p>
+      <p><strong>Usage data:</strong> We track post view counts and like counts. We do not use third-party analytics or tracking pixels.</p>
+      <p><strong>Media uploads:</strong> Images and videos you attach to posts are stored on our servers.</p>
+
+      <h2>2. How We Use Your Information</h2>
+      <ul>
+        <li>To provide and operate the SageBlog service</li>
+        <li>To display your username alongside your posts and comments</li>
+        <li>To generate AI-powered blog posts and chat responses</li>
+        <li>To improve the quality and relevance of content</li>
+      </ul>
+
+      <h2>3. AI-Generated Content</h2>
+      <p>Questions submitted to SageAI are used to generate responses via Cloudflare Workers AI. Your questions may be saved as blog posts on the platform. By submitting a question, you consent to it being published.</p>
+
+      <h2>4. Data Sharing</h2>
+      <p>We do not sell, rent, or share your personal information with third parties except:</p>
+      <ul>
+        <li><strong>Cloudflare:</strong> Our infrastructure provider. Traffic passes through Cloudflare's network.</li>
+        <li><strong>Google Translate:</strong> When you select a non-English language, your question and AI response text are sent to Google's translation API.</li>
+        <li><strong>Legal requirements:</strong> If required by law or to protect our rights.</li>
+      </ul>
+
+      <h2>5. Cookies &amp; Local Storage</h2>
+      <p>We use browser local storage (not cookies) to store your session token, username, and preferences such as theme and language selection. No advertising cookies are used.</p>
+
+      <h2>6. Data Retention</h2>
+      <p>Your account and content remain stored until you request deletion. Guest tokens expire after inactivity. You may contact us to request deletion of your data.</p>
+
+      <h2>7. Your Rights</h2>
+      <p>You have the right to access, correct, or delete your personal data. To exercise these rights, contact us at the address below.</p>
+
+      <h2>8. Security</h2>
+      <p>We use industry-standard security measures including HTTPS, hashed passwords, and JWT-based authentication. No method of transmission over the internet is 100% secure.</p>
+
+      <h2>9. Children's Privacy</h2>
+      <p>SageBlog is not directed at children under 13. We do not knowingly collect personal information from children.</p>
+
+      <h2>10. Changes to This Policy</h2>
+      <p>We may update this policy from time to time. Changes will be posted on this page with an updated date.</p>
+
+      <h2>11. Contact</h2>
+      <p>For privacy-related questions, please reach out via the <a href="/chat">SageAI chat</a> or open an issue on our platform.</p>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom">
+      <span>© <span class="copy-year"></span> SageBlog.cfd</span>
+      <span><a href="/privacy" style="color:var(--text-3)">Privacy</a> · <a href="/terms" style="color:var(--text-3)">Terms</a></span>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+import { updateHeaderAuth } from '/assets/js/auth.js';
+updateHeaderAuth();
+document.querySelectorAll('.copy-year').forEach(el => el.textContent = new Date().getFullYear());
+</script>
+</body>
+</html>

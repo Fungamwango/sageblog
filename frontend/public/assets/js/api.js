@@ -1,7 +1,7 @@
 const API_BASE = 'https://api.sageblog.cfd';
 
 export async function apiFetch(path, options = {}) {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('quick_token');
   const headers = { 'Content-Type': 'application/json', ...options.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 

@@ -81,7 +81,7 @@
 <footer class="site-footer">
   <div class="container">
     <div class="footer-bottom">
-      <span>© 2025 SageBlog.cfd</span>
+      <span>© <span class="copy-year"></span> SageBlog.cfd</span>
       <span>Powered by Cloudflare Workers AI</span>
     </div>
   </div>
@@ -155,16 +155,22 @@ function renderPost(p) {
       <p class="post-subtitle">${escHtml(p.excerpt)}</p>
       <div class="post-byline">
         <span class="post-byline-item">📅 ${formatDate(p.published_at)}</span>
-        <span class="post-byline-item">⏱ ${p.read_time || 5} min read</span>
         <span class="post-byline-item">👁 ${p.view_count} views</span>
         <span class="post-byline-item">♥ <span id="like-count">${p.like_count}</span> likes</span>
         <span class="post-byline-item">💬 ${p.comment_count} comments</span>
+        <button class="btn btn-outline btn-sm" id="byline-share-btn">↗ Share</button>
       </div>
     </div>
   `;
 
 
   document.getElementById('post-content').innerHTML = mdToHtml(p.content);
+
+  // Hide broken images, make remaining ones full-width
+  document.getElementById('post-content').querySelectorAll('img').forEach(img => {
+    img.onerror = () => { img.closest('.post-media')?.remove() || img.remove(); };
+    img.style.cssText = 'width:100%;max-width:100%;height:auto;border-radius:10px;margin:1.25rem 0;display:block;object-fit:cover';
+  });
 
   // Post footer: tags + like
   const tags = (p.tags || []).map(t =>
@@ -198,6 +204,7 @@ function renderPost(p) {
 
   document.getElementById('like-btn').addEventListener('click', handleLike);
   document.getElementById('share-btn').addEventListener('click', () => sharePost(p.title, postUrl));
+  document.getElementById('byline-share-btn').addEventListener('click', () => sharePost(p.title, postUrl));
 
   document.getElementById('edit-post-btn')?.addEventListener('click', () => {
     const wrap = document.getElementById('edit-post-wrap');
@@ -205,12 +212,16 @@ function renderPost(p) {
     wrap.innerHTML = `
       <div style="margin-top:1rem;padding:1.25rem;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r)">
         <h4 style="margin-bottom:0.75rem">Edit Post</h4>
-        <textarea id="edit-post-content" rows="10" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem;color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;resize:vertical">${escHtml(p.content)}</textarea>
+        <textarea id="edit-post-content" rows="10" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.75rem;color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;resize:vertical"></textarea>
         <div style="display:flex;gap:0.5rem;margin-top:0.75rem">
           <button class="btn btn-primary btn-sm" id="save-post-btn">Save</button>
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('edit-post-wrap').innerHTML=''">Cancel</button>
         </div>
       </div>`;
+    // Populate textarea with plain text (strip HTML tags)
+    const tmp = document.createElement('div');
+    tmp.innerHTML = p.content;
+    document.getElementById('edit-post-content').value = tmp.innerText || tmp.textContent || '';
     document.getElementById('save-post-btn').addEventListener('click', async () => {
       const content = document.getElementById('edit-post-content').value.trim();
       if (!content) return;
@@ -358,9 +369,8 @@ async function requireUser() {
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
       <div class="modal-box" role="dialog" aria-modal="true" style="max-width:340px">
-        <p class="modal-title">Choose a username</p>
-        <p class="modal-message" style="margin-bottom:0.75rem;font-size:0.85rem">Pick a name to join the conversation — no password needed.</p>
-        <input id="guest-username-input" type="text" placeholder="e.g. curiousreader" maxlength="30" minlength="2"
+        <p class="modal-title">Enter your name</p>
+        <input id="guest-username-input" type="text" placeholder="your name..." maxlength="30" minlength="2"
           style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem 0.75rem;color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;box-sizing:border-box;margin-bottom:0.4rem">
         <span id="guest-username-err" style="font-size:0.78rem;color:var(--danger);display:block;min-height:1rem;margin-bottom:0.5rem"></span>
         <div class="modal-actions">

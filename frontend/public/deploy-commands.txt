@@ -1,0 +1,6 @@
+
+#Back end deploy
+cd /c/others/sageblog/worker && npx wrangler deploy
+
+#Front end deploy
+cd /c/others/sageblog/frontend && npx wrangler pages deploy public --project-name sageblog-frontend

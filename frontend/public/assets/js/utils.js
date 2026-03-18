@@ -1,3 +1,6 @@
+// Set copyright year dynamically on all pages
+document.querySelectorAll('.copy-year').forEach(el => el.textContent = new Date().getFullYear());
+
 export function formatDate(dateStr) {
   if (!dateStr) return '';
   return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -204,7 +207,6 @@ export function renderPostCard(post) {
         <div class="post-card-footer">
           <div class="post-meta">
             <span class="meta-item">📅 ${formatDate(post.published_at)}</span>
-            <span class="meta-item">⏱ ${post.read_time || 5}m</span>
           </div>
           <div class="post-meta">
             <span class="meta-item">♥ ${post.like_count || 0}</span>
