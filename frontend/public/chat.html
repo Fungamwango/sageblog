@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<script>document.documentElement.dataset.theme=localStorage.getItem('theme')||'dark'</script>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ask SageBot — SageBlog</title>
+  <meta name="description" content="Ask SageBot anything — get AI answers in your language, instantly published as blog posts.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🔮</text></svg>">
+  <link rel="stylesheet" href="/assets/css/main.css">
+  <style>
+    .chat-wrap { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    .chat-header { text-align: center; margin-bottom: 2rem; }
+    .chat-header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    .chat-header p { color: var(--text-2); font-size: 0.95rem; }
+    .chat-input-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); padding: 1.25rem; margin-bottom: 1.5rem; }
+    .chat-input-row { display: flex; gap: 0.75rem; align-items: flex-end; }
+    .chat-input-row textarea { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 0.75rem; color: var(--text); font-family: var(--font); font-size: 0.95rem; outline: none; resize: vertical; min-height: 60px; }
+    .chat-input-row textarea:focus { border-color: var(--primary); }
+    .lang-row { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap; }
+    .lang-row label { font-size: 0.85rem; color: var(--text-2); }
+    .chat-response { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r); padding: 1.5rem; margin-bottom: 1.5rem; display: none; }
+    .chat-response .q-label { font-size: 0.78rem; color: var(--text-2); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .chat-response .q-text { font-weight: 600; font-size: 1.05rem; margin-bottom: 1.25rem; color: var(--heading); border-left: 3px solid var(--primary); padding-left: 0.75rem; }
+    .chat-response .a-label { font-size: 0.78rem; color: var(--text-2); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .chat-response .a-body { line-height: 1.75; color: var(--text); }
+    .chat-response .a-body p { margin: 0.6rem 0; }
+    .chat-response .a-body h3 { color: var(--heading); margin: 1rem 0 0.4rem; }
+    .chat-response .view-post { margin-top: 1rem; font-size: 0.85rem; }
+    .chat-history { }
+    .history-item { background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 1rem; margin-bottom: 0.75rem; cursor: pointer; transition: border-color 0.15s; }
+    .history-item:hover { border-color: var(--primary); }
+    .history-item .hi-q { font-weight: 500; font-size: 0.9rem; color: var(--heading); margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-item .hi-meta { font-size: 0.78rem; color: var(--text-2); }
+    .typing-indicator { padding: 0.5rem 0; }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="site-logo">🔮 Sage<span>Blog</span></a>
+    <nav class="header-nav">
+      <a href="/">Home</a>
+      <a href="/chat" class="active">Ask AI</a>
+    </nav>
+    <div class="header-actions" id="header-auth"></div>
+  </div>
+</header>
+
+<main>
+  <div class="chat-wrap">
+    <div class="chat-header">
+      <h1>🤖 Ask SageBot</h1>
+      <p>Ask anything — your question gets an AI answer and is published as a blog post.</p>
+    </div>
+
+    <div class="chat-input-box">
+      <div class="chat-input-row">
+        <textarea id="chat-input" placeholder="Ask a question… e.g. Why do humans dream?" rows="3"></textarea>
+        <button class="btn btn-primary" id="chat-send" style="white-space:nowrap;padding:0.6rem 1.25rem">Ask →</button>
+      </div>
+      <div class="lang-row">
+        <label>🌐 Respond in:</label>
+        <!-- Searchable language picker -->
+        <div id="lang-picker" style="position:relative">
+          <button type="button" id="lang-btn" class="btn btn-outline btn-sm" style="min-width:140px;display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
+            <span id="lang-btn-label">English</span><span>▾</span>
+          </button>
+          <div id="lang-dropdown" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);box-shadow:0 8px 24px rgba(0,0,0,0.3);min-width:220px;max-height:280px;overflow:hidden">
+            <div style="padding:0.5rem">
+              <input type="text" id="lang-search" placeholder="Search language or enter code…" autocomplete="off"
+                style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.4rem 0.6rem;color:var(--text);font-size:0.85rem;outline:none;box-sizing:border-box">
+            </div>
+            <ul id="lang-list" style="list-style:none;padding:0;margin:0;overflow-y:auto;max-height:210px"></ul>
+          </div>
+        </div>
+        <input type="hidden" id="lang-select" value="en">
+        <span id="chat-status" style="font-size:0.82rem;color:var(--text-2)"></span>
+      </div>
+    </div>
+
+    <!-- Response -->
+    <div class="chat-response" id="chat-response">
+      <div class="q-label">Your question</div>
+      <div class="q-text" id="resp-question"></div>
+      <div class="a-label">SageBot's answer</div>
+      <div class="a-body" id="resp-answer"></div>
+      <div class="view-post" id="resp-post-link"></div>
+    </div>
+
+    <!-- History -->
+    <div id="chat-history"></div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom">
+      <span>© 2025 SageBlog.cfd</span>
+      <span>Powered by Cloudflare Workers AI</span>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+import { updateHeaderAuth } from '/assets/js/auth.js';
+import { escHtml, mdToHtml } from '/assets/js/utils.js';
+
+updateHeaderAuth();
+
+const API = 'https://api.sageblog.cfd';
+const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+
+const input = document.getElementById('chat-input');
+const sendBtn = document.getElementById('chat-send');
+const langSel = document.getElementById('lang-select'); // kept for legacy ref
+const statusEl = document.getElementById('chat-status');
+const respBox = document.getElementById('chat-response');
+const respQ = document.getElementById('resp-question');
+const respA = document.getElementById('resp-answer');
+const respPost = document.getElementById('resp-post-link');
+
+// ── Searchable language picker ────────────────────────────────
+const LANGS = [
+  ['en','English'],['es','Español'],['fr','Français'],['de','Deutsch'],['pt','Português'],
+  ['it','Italiano'],['nl','Nederlands'],['ru','Русский'],['zh-CN','中文 (简体)'],['zh-TW','中文 (繁體)'],
+  ['ja','日本語'],['ko','한국어'],['ar','العربية'],['hi','हिन्दी'],['bn','বাংলা'],
+  ['sw','Kiswahili'],['yo','Yorùbá'],['ha','Hausa'],['am','አማርኛ'],['ig','Igbo'],['zu','Zulu'],
+  ['tr','Türkçe'],['pl','Polski'],['vi','Tiếng Việt'],['th','ภาษาไทย'],['id','Bahasa Indonesia'],
+  ['ms','Bahasa Melayu'],['uk','Українська'],['ro','Română'],['cs','Čeština'],['sk','Slovenčina'],
+  ['sv','Svenska'],['no','Norsk'],['da','Dansk'],['fi','Suomi'],['hu','Magyar'],['el','Ελληνικά'],
+  ['he','עברית'],['fa','فارسی'],['ur','اردو'],['ta','தமிழ்'],['te','తెలుగు'],['ml','മലയാളം'],
+  ['kn','ಕನ್ನಡ'],['mr','मराठी'],['gu','ગુજરાતી'],['pa','ਪੰਜਾਬੀ'],['ne','नेपाली'],['si','සිංහල'],
+  ['tl','Filipino'],['ceb','Cebuano'],['jw','Javanese'],['ca','Català'],['lt','Lietuvių'],
+  ['lv','Latviešu'],['et','Eesti'],['sl','Slovenščina'],['hr','Hrvatski'],['sr','Српски'],
+  ['bg','Български'],['mk','Македонски'],['bs','Bosanski'],['sq','Shqip'],['ka','ქართული'],
+  ['hy','Հայերեն'],['az','Azərbaycanca'],['kk','Қазақша'],['uz','Oʻzbek'],['ky','Кыргызча'],
+  ['mn','Монгол'],['my','မြန်မာဘာသာ'],['km','ខ្មែរ'],['lo','ລາວ'],['gl','Galego'],['eu','Euskara'],
+  ['cy','Cymraeg'],['is','Íslenska'],['lb','Lëtzebuergesch'],['mt','Malti'],['af','Afrikaans'],
+  ['eo','Esperanto'],['la','Latin'],['ht','Haitian Creole'],['mi','Māori'],['sm','Samoan'],
+  ['haw','Hawaiian'],['xh','Xhosa'],['st','Sesotho'],['sn','Shona'],['so','Somali'],['bem','Bemba'],['ny','Chichewa / Nyanja'],['to','Tonga'],['loz','Lozi'],
+];
+
+let selectedLang = localStorage.getItem('chat_lang') || 'en';
+const langInput = document.getElementById('lang-select');
+const langBtn = document.getElementById('lang-btn');
+const langBtnLabel = document.getElementById('lang-btn-label');
+const langDropdown = document.getElementById('lang-dropdown');
+const langSearch = document.getElementById('lang-search');
+const langList = document.getElementById('lang-list');
+
+function setLang(code, label) {
+  selectedLang = code;
+  langInput.value = code;
+  langBtnLabel.textContent = label || code;
+  localStorage.setItem('chat_lang', code);
+  closeLangDropdown();
+}
+
+function renderLangList(filter = '') {
+  const q = filter.toLowerCase();
+  const matched = LANGS.filter(([code, name]) =>
+    !q || name.toLowerCase().includes(q) || code.toLowerCase().includes(q)
+  );
+  // If typed something not in list, offer using it as a custom GT code
+  const showCustom = filter && !LANGS.find(([c]) => c.toLowerCase() === filter.toLowerCase());
+  langList.innerHTML = matched.map(([code, name]) => `
+    <li data-code="${code}" data-name="${name}"
+      style="padding:0.45rem 0.75rem;cursor:pointer;font-size:0.875rem;${code === selectedLang ? 'background:var(--primary);color:#fff;' : 'color:var(--text)'}"
+      onmouseover="if(this.style.background!='var(--primary)')this.style.background='var(--bg-2)'"
+      onmouseout="if(this.style.background!='var(--primary)')this.style.background=''">
+      ${name} <span style="font-size:0.75rem;opacity:0.5">${code}</span>
+    </li>
+  `).join('') + (showCustom ? `
+    <li data-code="${filter}" data-name="${filter}"
+      style="padding:0.45rem 0.75rem;cursor:pointer;font-size:0.875rem;color:var(--primary-light);border-top:1px solid var(--border)"
+      onmouseover="this.style.background='var(--bg-2)'" onmouseout="this.style.background=''">
+      Use "<strong>${filter}</strong>" as Google Translate code
+    </li>
+  ` : '');
+  langList.querySelectorAll('li').forEach(li => {
+    li.addEventListener('click', () => setLang(li.dataset.code, li.dataset.name));
+  });
+}
+
+function closeLangDropdown() {
+  langDropdown.style.display = 'none';
+  langSearch.value = '';
+  renderLangList('');
+}
+
+langBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = langDropdown.style.display !== 'none';
+  langDropdown.style.display = open ? 'none' : 'block';
+  if (!open) { renderLangList(''); setTimeout(() => langSearch.focus(), 50); }
+});
+
+langSearch.addEventListener('input', () => renderLangList(langSearch.value.trim()));
+langSearch.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLangDropdown();
+  if (e.key === 'Enter') {
+    const first = langList.querySelector('li');
+    if (first) first.click();
+  }
+});
+document.addEventListener('click', e => {
+  if (!document.getElementById('lang-picker').contains(e.target)) closeLangDropdown();
+});
+
+// Init
+const initEntry = LANGS.find(([c]) => c === selectedLang);
+setLang(selectedLang, initEntry ? initEntry[1] : selectedLang);
+renderLangList('');
+
+// Allow Ctrl+Enter / Cmd+Enter to send
+input.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendBtn.click();
+});
+
+sendBtn.addEventListener('click', async () => {
+  const question = input.value.trim();
+  if (!question) return;
+  if (question.length < 3) { statusEl.textContent = 'Ask something longer…'; return; }
+
+  sendBtn.disabled = true;
+  statusEl.textContent = '';
+  respBox.style.display = 'block';
+  respQ.textContent = question;
+  respA.innerHTML = `<div id="chat-spinner" style="padding:1rem 0;display:flex;align-items:center;gap:0.75rem">
+    <div style="display:flex;gap:5px;align-items:center">
+      <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0s"></span>
+      <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.15s"></span>
+      <span style="width:8px;height:8px;background:#6366f1;border-radius:50%;display:inline-block;animation:bounce 1s infinite 0.3s"></span>
+    </div>
+    <span id="spinner-msg" style="font-size:0.875rem;color:var(--text-2)">Thinking…</span>
+    <span id="spinner-counter" style="font-size:0.78rem;color:var(--text-3);margin-left:auto">0s</span>
+  </div>`;
+  // Rotating messages + counter
+  const spinMsgs = ['Thinking…','Processing your question…','Consulting knowledge base…','Generating response…','Almost there…','Translating…'];
+  let spinSec = 0, spinIdx = 0;
+  const spinTimer = setInterval(() => {
+    spinSec++;
+    const msgEl = document.getElementById('spinner-msg');
+    const cntEl = document.getElementById('spinner-counter');
+    if (msgEl) msgEl.textContent = spinMsgs[spinIdx % spinMsgs.length];
+    if (cntEl) cntEl.textContent = spinSec + 's';
+    if (spinSec % 3 === 0) spinIdx++;
+  }, 1000);
+  respPost.innerHTML = '';
+  respBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  const token = localStorage.getItem('access_token') || localStorage.getItem('quick_token') || '';
+
+  try {
+    const res = await fetch(`${API}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        question,
+        language: langInput.value,
+        // Send last 6 turns as context (plain text answers, no HTML)
+        history: history.slice(0, 6).map(h => ({ question: h.question, answer: h.answer })),
+      }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error || 'Failed'); }
+    const data = await res.json();
+
+    respQ.textContent = data.question;
+    clearInterval(spinTimer);
+    respA.innerHTML = mdToHtml(data.answer);
+    if (data.post_slug) {
+      respPost.innerHTML = `<a href="/post/${escHtml(data.post_slug)}" class="btn btn-outline btn-sm">📖 View as blog post →</a>`;
+    }
+
+    // Save to local history
+    const entry = { question: data.question, answer: data.answer, post_slug: data.post_slug, lang: langInput.value, ts: Date.now() };
+    history.unshift(entry);
+    if (history.length > 20) history.pop();
+    localStorage.setItem('chat_history', JSON.stringify(history));
+    renderHistory();
+
+    input.value = '';
+    statusEl.textContent = '✓ Answer saved as a blog post';
+    setTimeout(() => { statusEl.textContent = ''; }, 4000);
+  } catch (e) {
+    clearInterval(spinTimer);
+    respA.innerHTML = `<p style="color:var(--danger)">Error: ${escHtml(e.message)}</p>`;
+  } finally {
+    sendBtn.disabled = false;
+  }
+});
+
+function renderHistory() {
+  const el = document.getElementById('chat-history');
+  if (!history.length) { el.innerHTML = ''; return; }
+  const langNames = { en:'English', es:'Español', fr:'Français', de:'Deutsch', pt:'Português', ar:'Arabic', zh:'Chinese', ja:'Japanese', ko:'Korean', hi:'Hindi', sw:'Swahili', yo:'Yorùbá', ha:'Hausa' };
+  el.innerHTML = `
+    <h4 style="margin-bottom:0.75rem;color:var(--text-2);font-size:0.85rem;text-transform:uppercase;letter-spacing:0.05em">Recent Questions</h4>
+    ${history.map((h, i) => `
+      <div class="history-item" onclick="loadHistory(${i})">
+        <div class="hi-q">${escHtml(h.question)}</div>
+        <div class="hi-meta">${langNames[h.lang] || h.lang} · ${new Date(h.ts).toLocaleDateString()}
+          ${h.post_slug ? ` · <a href="/post/${escHtml(h.post_slug)}" onclick="event.stopPropagation()" style="color:var(--primary-light)">view post</a>` : ''}
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+window.loadHistory = (i) => {
+  const h = history[i];
+  if (!h) return;
+  respQ.textContent = h.question;
+  respA.innerHTML = mdToHtml(h.answer);
+  respPost.innerHTML = h.post_slug
+    ? `<a href="/post/${escHtml(h.post_slug)}" class="btn btn-outline btn-sm">📖 View as blog post →</a>`
+    : '';
+  respBox.style.display = 'block';
+  respBox.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+renderHistory();
+</script>
+</body>
+</html>

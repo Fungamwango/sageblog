@@ -53,7 +53,9 @@
 import { quickLogin, login, isLoggedIn } from '/assets/js/auth.js';
 import { toggleTheme } from '/assets/js/theme.js';
 
-if (isLoggedIn()) window.location.href = '/';
+// Only auto-redirect if already admin; non-admin users may need to re-login as admin
+const params = new URLSearchParams(window.location.search);
+if (isLoggedIn() && !params.has('admin')) window.location.href = '/';
 
 const toggleBtn = document.getElementById('theme-toggle-btn');
 const isDark = () => (document.documentElement.dataset.theme || 'dark') === 'dark';
@@ -76,6 +78,14 @@ document.getElementById('join-form').addEventListener('submit', async e => {
     btn.disabled = false; btn.textContent = 'Continue →';
   }
 });
+
+// Auto-open admin form if ?admin param present
+if (params.has('admin')) {
+  document.getElementById('admin-form').classList.remove('hidden');
+  document.getElementById('join-form').classList.add('hidden');
+  document.getElementById('show-admin-btn').textContent = '← Back';
+  sessionStorage.setItem('returnTo', '/admin');
+}
 
 // Admin login toggle
 document.getElementById('show-admin-btn').addEventListener('click', () => {

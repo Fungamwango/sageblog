@@ -24,11 +24,13 @@
 <div class="admin-layout">
   <nav class="admin-sidebar">
     <h4>Menu</h4>
-    <button class="admin-nav-item active" onclick="showTab('dashboard')">📊 Dashboard</button>
-    <button class="admin-nav-item" onclick="showTab('generate')">🤖 Generate Posts</button>
-    <button class="admin-nav-item" onclick="showTab('logs')">📋 AI Logs</button>
-    <div style="height:1px;background:var(--border);margin:1rem 0"></div>
-    <a href="/" class="admin-nav-item">← Back to Blog</a>
+    <div class="admin-sidebar-nav">
+      <button class="admin-nav-item active" onclick="showTab('dashboard')">📊 Dashboard</button>
+      <button class="admin-nav-item" onclick="showTab('posts')">📝 Posts</button>
+      <button class="admin-nav-item" onclick="showTab('users')">👥 Users</button>
+      <button class="admin-nav-item" onclick="showTab('generate')">🤖 Generate</button>
+      <a href="/" class="admin-nav-item">← Blog</a>
+    </div>
   </nav>
 
   <main class="admin-content" id="admin-content">
@@ -42,6 +44,24 @@
         <div class="stat-card skeleton" style="height:90px"></div>
         <div class="stat-card skeleton" style="height:90px"></div>
       </div>
+    </div>
+
+    <!-- Posts Tab -->
+    <div id="tab-posts" class="hidden">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap">
+        <h2 style="margin:0">Posts</h2>
+        <input type="text" id="posts-search" placeholder="Search by title or slug…"
+          style="flex:1;min-width:200px;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.45rem 0.75rem;color:var(--text);font-size:0.875rem;outline:none">
+      </div>
+      <div id="posts-table"></div>
+      <div class="pagination" id="posts-pagination" style="margin-top:1rem"></div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" class="hidden">
+      <h2 style="margin-bottom:1.5rem">Users</h2>
+      <div id="users-table"></div>
+      <div class="pagination" id="users-pagination" style="margin-top:1rem"></div>
     </div>
 
     <!-- Generate Tab -->
@@ -71,16 +91,11 @@
       <div id="gen-results" style="margin-top:1.5rem"></div>
     </div>
 
-    <!-- Logs Tab -->
-    <div id="tab-logs" class="hidden">
-      <h2 style="margin-bottom:1.5rem">AI Generation Logs</h2>
-      <div id="logs-table"></div>
-    </div>
   </main>
 </div>
 
 <script type="module">
-import { get, post } from '/assets/js/api.js';
+import { get, post, del } from '/assets/js/api.js';
 import { updateHeaderAuth, isAdmin } from '/assets/js/auth.js';
 import { escHtml, formatDate, toast } from '/assets/js/utils.js';
 
@@ -91,28 +106,133 @@ if (!isAdmin()) {
     <div style="padding:4rem;text-align:center;width:100%">
       <h2>Access Denied</h2>
       <p class="text-dim">You need admin access.</p>
-      <a href="/login" class="btn btn-primary" style="margin-top:1rem">Sign In</a>
+      <a href="/login?admin=1" class="btn btn-primary" style="margin-top:1rem">Admin Sign In</a>
     </div>`;
 } else {
   init();
 }
 
+let postsPage = 1, usersPage = 1;
+
 function init() {
   loadStats();
   loadCategoriesForGen();
-
   document.getElementById('gen-btn').addEventListener('click', generatePosts);
+  document.getElementById('posts-search').addEventListener('input', debounce(() => { postsPage = 1; loadPosts(); }, 400));
 }
 
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
 window.showTab = (tab) => {
-  ['dashboard', 'generate', 'logs'].forEach(t => {
+  ['dashboard', 'posts', 'users', 'generate'].forEach(t => {
     document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
   });
-  document.querySelectorAll('.admin-nav-item').forEach((btn, i) => {
+  document.querySelectorAll('.admin-nav-item').forEach(btn => {
     btn.classList.toggle('active', btn.getAttribute('onclick') === `showTab('${tab}')`);
   });
-  if (tab === 'logs') loadLogs();
+  if (tab === 'posts') loadPosts();
+  if (tab === 'users') loadUsers();
 };
+
+async function loadPosts() {
+  const wrap = document.getElementById('posts-table');
+  const search = document.getElementById('posts-search').value.trim();
+  wrap.innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+  try {
+    const data = await get(`/admin/posts?page=${postsPage}${search ? '&search=' + encodeURIComponent(search) : ''}`);
+    if (!data.posts.length) { wrap.innerHTML = '<p class="text-dim">No posts found.</p>'; document.getElementById('posts-pagination').innerHTML = ''; return; }
+    wrap.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+      <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
+        <th style="padding:0.6rem">Title</th>
+        <th style="padding:0.6rem">Category</th>
+        <th style="padding:0.6rem">Author</th>
+        <th style="padding:0.6rem">Views</th>
+        <th style="padding:0.6rem">Date</th>
+        <th style="padding:0.6rem">Actions</th>
+      </tr></thead>
+      <tbody>${data.posts.map(p => `
+        <tr style="border-bottom:1px solid var(--border)" id="post-row-${p.id}">
+          <td style="padding:0.6rem;max-width:300px">
+            <a href="/post/${escHtml(p.slug)}" target="_blank" style="color:var(--primary-light);font-weight:500">${escHtml(p.title)}</a>
+            ${p.ai_generated ? '<span class="ai-badge" style="margin-left:4px;font-size:0.7rem">🤖</span>' : '<span class="ai-badge" style="margin-left:4px;font-size:0.7rem;background:rgba(99,102,241,0.15);color:var(--primary-light)">👤</span>'}
+          </td>
+          <td style="padding:0.6rem;color:var(--text-2)">${escHtml(p.category_name || '—')}</td>
+          <td style="padding:0.6rem;color:var(--text-2)">${escHtml(p.author_username || 'AI')}</td>
+          <td style="padding:0.6rem;color:var(--text-2)">${p.view_count || 0}</td>
+          <td style="padding:0.6rem;color:var(--text-2)">${formatDate(p.published_at)}</td>
+          <td style="padding:0.6rem;white-space:nowrap">
+            <a href="/post/${escHtml(p.slug)}" target="_blank" class="btn btn-outline btn-sm" style="font-size:0.75rem;padding:0.2rem 0.5rem">View</a>
+            <button class="btn btn-outline btn-sm" style="font-size:0.75rem;padding:0.2rem 0.5rem;color:var(--danger);margin-left:4px" onclick="adminDeletePost(${p.id})">Delete</button>
+          </td>
+        </tr>
+      `).join('')}</tbody>
+    </table></div>`;
+    renderPag('posts-pagination', postsPage, data.pages, p => { postsPage = p; loadPosts(); });
+  } catch { wrap.innerHTML = '<p style="color:var(--danger)">Failed to load posts.</p>'; }
+}
+
+window.adminDeletePost = async (id) => {
+  if (!confirm('Delete this post permanently?')) return;
+  try {
+    await del(`/admin/posts/${id}`);
+    document.getElementById(`post-row-${id}`)?.remove();
+    toast('Post deleted');
+    loadStats();
+  } catch (e) { toast(e.message || 'Failed', 'error'); }
+};
+
+async function loadUsers() {
+  const wrap = document.getElementById('users-table');
+  wrap.innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+  try {
+    const data = await get(`/admin/users?page=${usersPage}`);
+    if (!data.users.length) { wrap.innerHTML = '<p class="text-dim">No users.</p>'; return; }
+    wrap.innerHTML = `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+      <thead><tr style="border-bottom:1px solid var(--border);text-align:left">
+        <th style="padding:0.6rem">Username</th>
+        <th style="padding:0.6rem">Role</th>
+        <th style="padding:0.6rem">Posts</th>
+        <th style="padding:0.6rem">Comments</th>
+        <th style="padding:0.6rem">Joined</th>
+        <th style="padding:0.6rem">Actions</th>
+      </tr></thead>
+      <tbody>${data.users.map(u => `
+        <tr style="border-bottom:1px solid var(--border)" id="user-row-${u.id}">
+          <td style="padding:0.6rem;font-weight:500">${escHtml(u.username)}</td>
+          <td style="padding:0.6rem"><span style="color:${u.role === 'admin' ? 'var(--warning)' : 'var(--text-2)'}">${escHtml(u.role)}</span></td>
+          <td style="padding:0.6rem;color:var(--text-2)">${u.post_count || 0}</td>
+          <td style="padding:0.6rem;color:var(--text-2)">${u.comment_count || 0}</td>
+          <td style="padding:0.6rem;color:var(--text-2)">${formatDate(u.created_at)}</td>
+          <td style="padding:0.6rem">
+            ${u.role !== 'admin' ? `<button class="btn btn-outline btn-sm" style="font-size:0.75rem;padding:0.2rem 0.5rem;color:var(--danger)" onclick="adminDeleteUser(${u.id})">Delete</button>` : '—'}
+          </td>
+        </tr>
+      `).join('')}</tbody>
+    </table></div>`;
+    renderPag('users-pagination', usersPage, data.pages, p => { usersPage = p; loadUsers(); });
+  } catch { wrap.innerHTML = '<p style="color:var(--danger)">Failed to load users.</p>'; }
+}
+
+window.adminDeleteUser = async (id) => {
+  if (!confirm('Delete this user? Their posts will be kept as anonymous.')) return;
+  try {
+    await del(`/admin/users/${id}`);
+    document.getElementById(`user-row-${id}`)?.remove();
+    toast('User deleted');
+    loadStats();
+  } catch (e) { toast(e.message || 'Failed', 'error'); }
+};
+
+function renderPag(elId, page, pages, onPage) {
+  const el = document.getElementById(elId);
+  if (pages <= 1) { el.innerHTML = ''; return; }
+  let h = '';
+  if (page > 1) h += `<button class="page-btn" onclick="(${onPage})(${page - 1})">← Prev</button>`;
+  for (let i = Math.max(1, page - 2); i <= Math.min(pages, page + 2); i++)
+    h += `<button class="page-btn ${i === page ? 'active' : ''}" onclick="(${onPage})(${i})">${i}</button>`;
+  if (page < pages) h += `<button class="page-btn" onclick="(${onPage})(${page + 1})">Next →</button>`;
+  el.innerHTML = h;
+}
 
 async function loadStats() {
   try {
@@ -165,6 +285,20 @@ async function generatePosts() {
     btn.disabled = false;
     btn.textContent = '🤖 Generate Now';
   }
+}
+
+let clearLogsBound = false;
+function bindClearLogs() {
+  if (clearLogsBound) return;
+  clearLogsBound = true;
+  document.getElementById('clear-logs-btn').addEventListener('click', async () => {
+    if (!confirm('Clear all AI generation logs?')) return;
+    try {
+      await del('/admin/logs');
+      toast('Logs cleared');
+      loadLogs();
+    } catch (e) { toast(e.message || 'Failed', 'error'); }
+  });
 }
 
 async function loadLogs() {

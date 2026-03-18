@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npm install:*)",
       "Bash(npx wrangler:*)",
-      "Bash(curl -sI https://sageblog-frontend.pages.dev/assets/css/main.css)"
+      "Bash(curl -sI https://sageblog-frontend.pages.dev/assets/css/main.css)",
+      "Bash(npm run:*)"
     ]
   }
 }

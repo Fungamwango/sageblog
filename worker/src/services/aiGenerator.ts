@@ -100,35 +100,78 @@ const MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 const TOPICS: Record<string, string[]> = {
   technology: [
-    'artificial intelligence breakthroughs', 'quantum computing advances',
-    'cybersecurity threats', 'cloud computing trends', 'open source software',
-    'developer productivity tools', 'API design best practices',
-    'machine learning in production', 'edge computing innovations',
+    'why most AI demos fail in production and what engineers do differently',
+    'the hidden costs of cloud computing that nobody talks about',
+    'how open source maintainers are quietly burning out',
+    'what quantum computing can actually do right now versus the hype',
+    'the real reason cybersecurity keeps failing despite billion-dollar budgets',
+    'how edge computing is changing the way apps feel on mobile',
+    'the unspoken tradeoffs in modern API design',
+    'why developer tools have become a $50B market',
+    'how machine learning models fail silently in the real world',
+    'the quiet revolution happening in database technology',
+    'what big tech layoffs actually tell us about the software industry',
+    'why most software rewrites fail and what to do instead',
   ],
   science: [
-    'space exploration milestones', 'climate science research',
-    'genomics and gene editing', 'particle physics discoveries',
-    'ocean exploration findings', 'renewable energy science',
+    'what the James Webb telescope has genuinely changed about cosmology',
+    'the uncomfortable truth about reproducibility in science',
+    'how gene editing moved from lab curiosity to clinical reality',
+    'what deep ocean expeditions keep finding that surprises researchers',
+    'the physics breakthrough that almost nobody outside academia noticed',
+    'how climate models work and why they keep being right',
+    'the strange biology of animals that barely age',
+    'what nuclear fusion actually needs to become practical',
+    'how microbes are quietly running the planet',
+    'the neuroscience of why humans are terrible at assessing risk',
   ],
   business: [
-    'startup funding trends', 'remote work culture shifts',
-    'supply chain resilience', 'fintech disruption',
-    'e-commerce growth strategies', 'leadership in tech companies',
+    'why most startups die from indigestion not starvation',
+    'what venture capital gets systematically wrong about founders',
+    'how supply chains broke and why they are not fully fixed',
+    'the real economics of the creator economy nobody advertises',
+    'why remote work productivity data is deeply misleading',
+    'how fintech companies are quietly replacing banks for a generation',
+    'the management mistake that kills otherwise great companies',
+    'what small businesses know about customer loyalty that corporations ignore',
+    'why pricing strategy is the most underrated startup skill',
+    'how the subscription economy changed what ownership means',
   ],
   health: [
-    'mental health in the digital age', 'nutrition science updates',
-    'longevity research', 'telemedicine adoption',
-    'gut microbiome discoveries', 'sleep science advances',
+    'what decades of sleep research actually agrees on',
+    'the gut microbiome findings that forced scientists to rethink immunity',
+    'why the longevity research coming out of labs is more interesting than supplements',
+    'how chronic stress physically changes the brain over time',
+    'the nutrition advice that keeps getting quietly reversed',
+    'what telemedicine got right and where it still struggles',
+    'the science behind why exercise works on mental health',
+    'how the definition of a healthy diet became so contested',
+    'what cancer screening data actually shows about early detection',
+    'the real story behind rising rates of childhood allergies',
   ],
   culture: [
-    'streaming wars and entertainment', 'social media trends',
-    'independent creator economy', 'gaming culture evolution',
-    'book publishing in the digital era', 'global cultural exchanges',
+    'how algorithms quietly reshaped what music gets made',
+    'the economics of why blockbuster movies keep getting bigger and worse',
+    'what the decline of third places is doing to communities',
+    'how video games became the dominant cultural medium nobody admits to',
+    'the strange death and rebirth of independent bookstores',
+    'what fan communities reveal about how stories create identity',
+    'how social media changed the way humans experience collective events',
+    'the cultural gap between how people say they spend time and how they actually do',
+    'why nostalgia became the defining aesthetic of the past decade',
+    'what podcasts replaced that radio and TV could not',
   ],
   environment: [
-    'electric vehicle adoption', 'carbon capture technologies',
-    'sustainable agriculture', 'ocean plastic solutions',
-    'urban green spaces', 'wildlife conservation efforts',
+    'why electric vehicles alone will not solve urban air quality',
+    'the carbon capture approaches that actually have hard data behind them',
+    'how regenerative agriculture differs from organic farming in practice',
+    'the ocean plastic problem is worse than the headline numbers suggest',
+    'what rewilding projects have genuinely taught conservation biology',
+    'how cities are redesigning themselves around heat rather than cold',
+    'the hidden environmental cost of streaming and data centers',
+    'why battery storage is the real bottleneck in renewable energy',
+    'what indigenous land management practices are teaching modern conservation',
+    'the surprising countries making the fastest progress on emissions',
   ],
 };
 
@@ -139,9 +182,9 @@ export async function generatePost(env: Env, categorySlug: string, categoryId: n
   // Pick a topic not recently covered
   const topic = topics[Math.floor(Math.random() * topics.length)];
 
-  const systemPrompt = `You are an expert blog writer for SageBlog (sageblog.cfd), a high-quality knowledge blog.
-Write detailed, informative, engaging blog posts.
-IMPORTANT: You must respond using EXACTLY this format with these exact delimiter lines — no other text:
+  const systemPrompt = `You are a sharp, opinionated staff writer for SageBlog — a no-nonsense knowledge blog that respects readers' intelligence.
+Your writing is direct, specific, and grounded in real evidence. You avoid hype, fluff, and marketing language.
+Respond ONLY using these exact delimiters — no extra text before or after:
 ===TITLE===
 (title here)
 ===SLUG===
@@ -160,40 +203,103 @@ IMPORTANT: You must respond using EXACTLY this format with these exact delimiter
 (full HTML content here)
 ===END===`;
 
-  const userPrompt = `Write a unique, detailed blog post about: "${topic}" in the ${categorySlug} category.
-${recentTitles.length > 0 ? `IMPORTANT: These titles already exist — do NOT repeat or closely paraphrase them:\n${recentTitles.join('\n')}` : ''}
+  const BANNED_OPENERS = [
+    'unlock', 'unlocking', 'unveil', 'unveiling', 'dive into', 'delve into',
+    'in today\'s', 'in the ever-', 'in an era', 'in a world', 'welcome to',
+    'have you ever', 'imagine a world', 'it\'s no secret', 'the future is',
+    'revolutionize', 'revolutionizing', 'game-changer', 'game-changing',
+    'transformative', 'groundbreaking', 'cutting-edge', 'explore', 'exploring',
+    'navigating', 'harnessing', 'leveraging', 'empowering', 'journey',
+    'landscape', 'paradigm', 'ever-evolving', 'rapidly changing',
+  ].join(', ');
 
-Title rules:
-- Compelling and specific (under 70 chars)
-- NEVER include years like 2024, 2025, 2026 or phrases like "in [year]", "for [year]"
-- Must be meaningfully different from any existing title above
-Slug: URL-friendly version of the title
-Excerpt: 150-200 character engaging summary
-Tags: 4-5 relevant tags, comma-separated
-Meta_title: SEO optimized, under 60 chars, no year
-Meta_desc: 150-160 chars, complete sentence
-Read_time: estimated minutes (number only)
-Content: 900-1400 words using HTML tags: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>
-Include at least 3 sections with <h2> headings.`;
+  // Rotate through varied opening styles so posts don't all feel the same
+  const openingStyles = [
+    'Start with a striking statistic or number that most people would not guess.',
+    'Open with a short, concrete scene or anecdote — put the reader inside a specific moment.',
+    'Begin with a direct, counterintuitive claim that challenges a common assumption.',
+    'Lead with a question that the reader genuinely cannot answer yet — then answer it in the paragraph.',
+    'Open with a specific failure or mistake — name the company, person, or study that got it wrong.',
+    'Start with a sharp contrast: what most people believe vs. what the data actually shows.',
+    'Begin with a specific number, date, or place that anchors the story in reality.',
+  ];
+  const openingStyle = openingStyles[Math.floor(Math.random() * openingStyles.length)];
+
+  const titleStyles = [
+    `"Why [Specific Group] [Does Something Surprising] — And What It Means for Everyone Else"`,
+    `"The [Specific Thing] Nobody Talks About in [Field]"`,
+    `"[Number] Years of [Research/Data] on [Topic] Points to One Uncomfortable Truth"`,
+    `"What [Company/Study/Expert] Got Wrong About [Topic] — And Who Got It Right"`,
+    `"Inside [Specific Process/System]: Why It Works Less Like You Think"`,
+    `"[Topic] Is Broken. Here Is Exactly How and Why."`,
+    `"The Quiet [Change/Problem/Revolution] Happening in [Field] That Most People Miss"`,
+  ];
+  const titleStyleHint = titleStyles[Math.floor(Math.random() * titleStyles.length)];
+
+  const userPrompt = `Write a detailed, specific blog post on this angle: "${topic}"
+Category: ${categorySlug}
+${recentTitles.length > 0 ? `These titles already exist — write something distinctly different:\n${recentTitles.slice(0, 20).join('\n')}` : ''}
+
+TITLE rules (critical):
+- 70–120 characters long — specific, concrete, not vague or generic
+- Written like a sharp magazine editor or essayist — confident, direct, specific
+- Style hint (use as inspiration, not a template): ${titleStyleHint}
+- Can be a bold statement, a revealing question, a surprising contrast, or an exposé framing
+- BANNED title starters: ${BANNED_OPENERS}
+- NEVER start with "Unlock", "Unveil", "Explore", "Dive", "Delve", "The Future of", "Revolutioniz", "Navigat", "Harness", "Leverage"
+- NO years (2024, 2025, 2026 etc.) in title
+- MUST be at least 70 characters — short vague titles are rejected
+- Examples of GOOD titles:
+  "Why Most AI Projects Die in Year Two and What the Survivors Did Differently"
+  "The Science Behind Why You Cannot Stop Doomscrolling, Explained Without Jargon"
+  "Inside the Quiet Collapse of the Open Source Funding Model"
+  "What Doctors Wish Patients Actually Understood About Chronic Pain Management"
+  "Sleep Research Has Been Saying the Same Thing for 40 Years — We Keep Ignoring It"
+  "The Real Reason Cybersecurity Keeps Failing Despite Billion-Dollar Budgets"
+
+CONTENT rules:
+- 1200–1600 words — thorough, not padded
+- Opening paragraph style: ${openingStyle} NEVER start with "In today's world", "In an era", "It's no secret", or any banned opener. The first sentence must hook immediately.
+- Use HTML: <h2>, <h3>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>
+- At least 4 <h2> sections with specific, descriptive headings — NOT "Introduction", "Overview", "Conclusion", "Final Thoughts"
+- Back every major claim with a specific example, named company, study, statistic, or real person
+- Vary sentence rhythm — mix short punchy sentences with longer analytical ones
+- End with a concrete, specific takeaway or implication the reader can act on or think about
+
+Excerpt: 150–200 chars, punchy and specific — make someone want to read
+Tags: 4–6 specific tags, comma-separated
+Meta_title: under 60 chars, no year
+Meta_desc: 150–160 chars, complete sentence
+Read_time: estimated minutes (number only)`;
 
   let raw = '';
   let parsed: GeneratedPost | null = null;
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      // On retry, add explicit reminder about title length
+      const retryNote = attempt > 0
+        ? `\n\nCRITICAL RETRY NOTE: Your previous title was too short (under 70 characters) or used a banned word. Write a LONGER, MORE SPECIFIC title — at least 70 characters, ideally 80-110. Think of a headline a senior editor at The Atlantic or Wired would write.`
+        : '';
+
       const response = await (env.AI as any).run(MODEL, {
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          { role: 'user', content: userPrompt + retryNote },
         ],
         max_tokens: 3500,
-        temperature: 0.75,
+        temperature: 1.0,
       });
 
       raw = typeof response === 'string' ? response : (response?.response ?? '');
       console.log(`[ai] attempt ${attempt} raw preview:`, raw.substring(0, 300));
       parsed = raw ? parseResponse(raw) : null;
-      if (parsed?.title && parsed?.content && parsed?.excerpt) break;
+      // Require title ≥ 40 chars to accept (we validate ≥ 20 later, but reject short ones for retry)
+      if (parsed?.title && parsed?.content && parsed?.excerpt && parsed.title.trim().length >= 40) break;
+      if (parsed?.title && parsed.title.trim().length < 40) {
+        console.log(`[ai] title too short (${parsed.title.length} chars): "${parsed.title}" — retrying`);
+        parsed = null;
+      }
     } catch (err) {
       console.error('[ai] model call failed:', err);
     }
@@ -201,6 +307,19 @@ Include at least 3 sections with <h2> headings.`;
 
   if (!parsed) {
     await logGeneration(env.DB, null, categoryId, userPrompt, MODEL, null, 'failed', `No parse: ${raw.substring(0, 300)}`);
+    return null;
+  }
+
+  // Reject placeholder/garbage titles
+  const BAD_TITLES = /^(title|slug|excerpt|content|post|blog|untitled|heading|n\/a|none|example|sample|here|placeholder)\.?$/i;
+  const title = parsed.title.trim();
+  // Detect garbage: non-ASCII chars, too many ALL_CAPS words, random brand noise
+  const nonAsciiRatio = (title.match(/[^\x00-\x7F]/g) || []).length / title.length;
+  const capsWords = (title.match(/\b[A-Z]{2,}\b/g) || []).length;
+  const wordCount = title.split(/\s+/).length;
+  const isGarbage = nonAsciiRatio > 0.05 || (capsWords > 3 && wordCount < 12) || title.length < 20;
+  if (BAD_TITLES.test(title) || isGarbage) {
+    await logGeneration(env.DB, null, categoryId, userPrompt, MODEL, null, 'failed', `Bad title: "${title}"`);
     return null;
   }
 

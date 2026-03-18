@@ -64,8 +64,11 @@ export function toast(message, type = 'success', duration = 3500) {
 /** Convert markdown text to HTML. Passes through already-valid HTML untouched. */
 export function mdToHtml(raw) {
   if (!raw) return '';
-  // If content looks like clean HTML (starts with a block tag), return as-is
-  if (/^\s*<(p|h[1-6]|ul|ol|div|section|blockquote)[\s>]/i.test(raw)) return raw;
+  // If content looks like clean HTML (starts with a block tag), just linkify bare URLs and return
+  if (/^\s*<(p|h[1-6]|ul|ol|div|section|blockquote)[\s>]/i.test(raw)) {
+    return raw.replace(/(?<![="'>])(https?:\/\/[^\s<>"']+)/g,
+      url => `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:var(--primary-light);word-break:break-all">${url}</a>`);
+  }
 
   const lines = raw.split('\n');
   const out = [];
@@ -196,7 +199,7 @@ export function renderPostCard(post) {
               : ''}
         </div>
         <h3>${escHtml(post.title)}</h3>
-        <p>${escHtml(post.excerpt)}</p>
+        <p>${escHtml(post.excerpt ? (post.excerpt.length >= 150 ? post.excerpt.substring(0, 150) + '…' : post.excerpt) : '')}</p>
         ${tags ? `<div class="post-tags">${tags}</div>` : ''}
         <div class="post-card-footer">
           <div class="post-meta">

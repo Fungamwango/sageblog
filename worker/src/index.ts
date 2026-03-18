@@ -8,6 +8,7 @@ import { handleAdmin } from './routes/adminRoutes';
 import { handleSEO } from './routes/seoRoutes';
 import { handleImages } from './routes/imageRoutes';
 import { handleNotifications } from './routes/notificationRoutes';
+import { handleChat } from './routes/chatRoutes';
 import { handleScheduled } from './scheduled/cronHandler';
 import type { Env } from './types';
 
@@ -71,6 +72,9 @@ export default {
       if (response) return response;
 
       response = await handleNotifications(path, method, request, env);
+      if (response) return response;
+
+      response = await handleChat(path, method, request, env);
       if (response) return response;
 
       return error('Not Found', 404, origin);

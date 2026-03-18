@@ -236,7 +236,10 @@ function renderPost(p) {
 }
 
 async function handleLike() {
-  if (!isLoggedIn()) { toast('Please sign in to like posts', 'error'); return; }
+  if (!isLoggedIn()) {
+    const user = await requireUser();
+    if (!user) return;
+  }
   try {
     const data = await post(`/posts/${slug}/like`, {});
     const btn = document.getElementById('like-btn');
@@ -252,20 +255,16 @@ async function loadComments() {
   const user = getUser();
   const formWrap = document.getElementById('comment-form-wrap');
 
-  if (isLoggedIn()) {
-    formWrap.innerHTML = `
-      <div class="comment-form">
-        <div class="form-group">
-          <label>Add a comment</label>
-          <textarea id="comment-input" placeholder="Share your thoughts…" rows="3"></textarea>
-        </div>
-        <button class="btn btn-primary btn-sm" id="submit-comment">Post Comment</button>
+  formWrap.innerHTML = `
+    <div class="comment-form">
+      <div class="form-group">
+        <label>Add a comment</label>
+        <textarea id="comment-input" placeholder="Share your thoughts…" rows="3"></textarea>
       </div>
-    `;
-    document.getElementById('submit-comment').addEventListener('click', submitComment);
-  } else {
-    formWrap.innerHTML = `<p class="text-muted text-sm mb-4"><a href="/login">Sign in</a> to leave a comment.</p>`;
-  }
+      <button class="btn btn-primary btn-sm" id="submit-comment">Post Comment</button>
+    </div>
+  `;
+  document.getElementById('submit-comment').addEventListener('click', submitComment);
 
   await fetchComments(1);
 }
@@ -310,7 +309,7 @@ function renderComment(c, isReply = false) {
           </div>
           <div class="comment-text">${linkify(c.content)}</div>
           <div class="comment-actions">
-            ${!isReply && isLoggedIn() ? `<button class="comment-action" onclick="showReply(${c.id})">Reply</button>` : ''}
+            ${!isReply ? `<button class="comment-action" onclick="showReply(${c.id})">Reply</button>` : ''}
             ${canDelete ? `<button class="comment-action" onclick="editComment(${c.id}, ${JSON.stringify(c.content)})">Edit</button>` : ''}
             ${canDelete ? `<button class="comment-action" style="color:var(--red)" onclick="deleteComment(${c.id})">Delete</button>` : ''}
           </div>
@@ -338,6 +337,10 @@ window.submitReply = async (parentId) => {
   const input = document.getElementById(`reply-${parentId}`);
   const content = input?.value?.trim();
   if (!content) return;
+  if (!isLoggedIn()) {
+    const user = await requireUser();
+    if (!user) return;
+  }
   try {
     await post(`/posts/${slug}/comments`, { content, parent_id: parentId });
     toast('Reply posted!');
@@ -346,6 +349,54 @@ window.submitReply = async (parentId) => {
     toast(e.message || 'Failed to post reply', 'error');
   }
 };
+
+// ── Username modal for guests ────────────────────────────────────
+async function requireUser() {
+  if (getUser()) return getUser();
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-box" role="dialog" aria-modal="true" style="max-width:340px">
+        <p class="modal-title">Choose a username</p>
+        <p class="modal-message" style="margin-bottom:0.75rem;font-size:0.85rem">Pick a name to join the conversation — no password needed.</p>
+        <input id="guest-username-input" type="text" placeholder="e.g. curiousreader" maxlength="30" minlength="2"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:0.5rem 0.75rem;color:var(--text);font-family:var(--font);font-size:0.9rem;outline:none;box-sizing:border-box;margin-bottom:0.4rem">
+        <span id="guest-username-err" style="font-size:0.78rem;color:var(--danger);display:block;min-height:1rem;margin-bottom:0.5rem"></span>
+        <div class="modal-actions">
+          <button class="btn btn-outline btn-sm" id="guest-cancel-btn">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="guest-join-btn">Join →</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('modal-visible'));
+
+    const close = val => { overlay.classList.remove('modal-visible'); setTimeout(() => overlay.remove(), 200); resolve(val); };
+
+    const doJoin = async () => {
+      const username = overlay.querySelector('#guest-username-input').value.trim();
+      const err = overlay.querySelector('#guest-username-err');
+      err.textContent = '';
+      if (!username || username.length < 2) { err.textContent = 'At least 2 characters required'; return; }
+      const btn = overlay.querySelector('#guest-join-btn');
+      btn.disabled = true; btn.textContent = 'Joining…';
+      try {
+        const { quickLogin } = await import('/assets/js/auth.js');
+        const user = await quickLogin(username);
+        updateHeaderAuth();
+        close(user);
+      } catch (e) {
+        err.textContent = e.message;
+        btn.disabled = false; btn.textContent = 'Join →';
+      }
+    };
+
+    overlay.querySelector('#guest-join-btn').addEventListener('click', doJoin);
+    overlay.querySelector('#guest-username-input').addEventListener('keydown', e => { if (e.key === 'Enter') doJoin(); });
+    overlay.querySelector('#guest-cancel-btn').addEventListener('click', () => close(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+  });
+}
 
 // ── Custom modal ────────────────────────────────────────────────
 function showModal({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false }) {
@@ -412,6 +463,10 @@ async function submitComment() {
   const input = document.getElementById('comment-input');
   const content = input.value.trim();
   if (!content) { toast('Comment cannot be empty', 'error'); return; }
+  if (!isLoggedIn()) {
+    const user = await requireUser();
+    if (!user) return;
+  }
   const btn = document.getElementById('submit-comment');
   btn.disabled = true;
   btn.textContent = 'Posting…';
